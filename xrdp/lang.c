@@ -156,8 +156,7 @@ key_to_scancode_index(const char *key)
 /**
  * Tests a value to see if it's a valid KeySym (decimal number)
  *
- * @param val
- * @param[out] keysym. Keysym value if 1 is returned
+ * @param[out] sym Keysym value if 1 is returned
  * @return Boolean != 0 if the string is valid
  */
 static int
@@ -185,7 +184,6 @@ is_valid_keysym(const char *val, int *sym)
 /**
  * Tests a value to see if it's a valid unicode character (U+xxxx)
  *
- * @param val
  * @param[out] chr value if 1 is returned
  * @return Boolean != 0 if the string is valid
  */
@@ -361,7 +359,7 @@ parse_km_general(toml_table_t *tfile, struct km_general *general)
  * Loads the [General] section only from a TOML file
  * @param filename Name of TOML file
  * @param quiet Set true to not log errors
- * @param[out] km_general Contents of [General] section. Defaults are provided.
+ * @param[out] general Contents of [General] section. Defaults are provided.
  * @return 0 if the operation was successful
  */
 static int

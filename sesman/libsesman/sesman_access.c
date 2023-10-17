@@ -41,7 +41,6 @@
 /**
  * user is root
  *
- * @param username
  * @return 1 if user is UID 0
  */
 static int

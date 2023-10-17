@@ -171,7 +171,7 @@ sesexec_is_ecp_active(void);
 /**
  * Terminate an active xrdp process
  *
- * @param Reason to pass back to the xrdp process (if connected)
+ * @param reason Reason to pass back to the xrdp process (if connected)
  *
  * After this call, g_ccp_trans will be NULL
  */

@@ -84,8 +84,6 @@ session_start(struct login_info *login_info,
  * The PID of a failed child process is removed from the session_data.
  *
  * @param sd session_data for this session
- * @param pid PID of exited process
- * @param e Exit status of the exited process
  */
 void
 session_process_sigchld_event(struct session_data *sd);
@@ -148,7 +146,7 @@ session_send_term(struct session_data *sd, int wait_for_all);
 /**
  * Frees a session_data object
  *
- * @param sd session_data for this session
+ * @param session_data session_data for this session
  *
  * Do not call this until session_active() returns zero, or you
  * lose the ability to track the session PIDs

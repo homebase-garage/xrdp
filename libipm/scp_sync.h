@@ -38,7 +38,7 @@
  * Waits on a single transport for a specific SCP message to be available for
  * parsing
  *
- * @param trans libipm transport
+ * @param t libipm transport
  * @param wait_msgno Message number to wait for
  * @return != 0 for error
  *

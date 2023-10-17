@@ -239,7 +239,7 @@ output_setxkbmap_comment(FILE *outf, const struct kbd_info *kbd_info)
  * Output a section of the keymap file
  * @param outf Output file
  * @param dpy X display
- * @param section name Section name (e.g. 'shift')
+ * @param section_name name Section name (e.g. 'shift')
  * @param event_state Modifier state needed for XKeyPressedEvent
  */
 static void
@@ -323,7 +323,7 @@ output_file_section(FILE *outf,
  * support this key.
  *
  * @param dpy X display
- * @reurn boolean
+ * @return boolean
  */
 static int
 is_caps_lock_supported(Display *dpy)

@@ -79,7 +79,7 @@ config_read(int use_logger, const char *sesman_ini);
 /**
  *
  * @brief Dumps configuration to stdout
- * @param pointer to a config_chansrv struct
+ * @param config pointer to a config_chansrv struct
  *
  */
 void
@@ -88,7 +88,7 @@ config_dump(struct config_chansrv *config);
 /**
  *
  * @brief Frees configuration allocated by config_read()
- * @param pointer to a config_chansrv struct (may be NULL)
+ * @param cs pointer to a config_chansrv struct (may be NULL)
  *
  */
 void

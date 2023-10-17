@@ -62,7 +62,7 @@ timers_oneshot_get_remaining(struct timers_oneshot *timer,
  * Variant of timers_oneshot_get_remaining() for g_obj_wait()
  * @param timer pointer to timer (or NULL)
  * @param now Value of g_get_elapsed_ms()
- * @param[in,out] poll timeout
+ * @param[in,out] timeout timeout
  *
  * Use this to update a timeout passed to g_obj_wait() (or poll()). The
  * timeout is updated if the timer will fire before the current timeout.

@@ -156,7 +156,7 @@ xrdp_wm_mouse_click(struct xrdp_wm *self, int x, int y, int but, int down);
 /**
  * Handle a TS_KEYBOARD_EVENT ([MS-RDPBCGR] 2.2.8.1.1.3.1.1.1)
  *
- * @param device_flags keyboardFlags value from PDU
+ * @param keyboard_flags keyboardFlags value from PDU
  * @param key_code keyCode value from PDU
  */
 int

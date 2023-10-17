@@ -38,7 +38,7 @@ alarm_handler(int signal_num)
  * are unsigned numbers
  *
  * @param display Display string
- * @param[out] sock_name, or ""
+ * @param[out] sock_name sock_name or ""
  * @param sock_name_len Length of sock_name
  * @return !=0 if sock_name is not NULL
  */

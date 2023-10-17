@@ -81,8 +81,8 @@ log_to_stdout(const enum logLevels lvl, const char *msg, ...)
  *
  * @param logmsg Function to use to log messages
  * @param names List of definitions in the section
- * @params values List of corresponding values for the names
- * @params cfg Pointer to structure we're filling in
+ * @param values List of corresponding values for the names
+ * @param cfg Pointer to structure we're filling in
  *
  * @return 0 for success
  */
@@ -136,8 +136,8 @@ read_config_globals(log_func_t logmsg,
  *
  * @param logmsg Function to use to log messages
  * @param names List of definitions in the section
- * @params values List of corresponding values for the names
- * @params cfg Pointer to structure we're filling in
+ * @param values List of corresponding values for the names
+ * @param cfg Pointer to structure we're filling in
  *
  * @return 0 for success
  */
@@ -189,8 +189,8 @@ read_config_security(log_func_t logmsg,
  *
  * @param logmsg Function to use to log messages
  * @param names List of definitions in the section
- * @params values List of corresponding values for the names
- * @params cfg Pointer to structure we're filling in
+ * @param values List of corresponding values for the names
+ * @param cfg Pointer to structure we're filling in
  *
  * @return 0 for success
  */
@@ -279,8 +279,8 @@ read_config_chansrv(log_func_t logmsg,
  *
  * @param logmsg Function to use to log messages
  * @param names List of definitions in the section
- * @params values List of corresponding values for the names
- * @params cfg Pointer to structure we're filling in
+ * @param values List of corresponding values for the names
+ * @param cfg Pointer to structure we're filling in
  *
  * @return 0 for success
  */
