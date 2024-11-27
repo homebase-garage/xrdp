@@ -202,7 +202,18 @@ static int sesman_listen_test(struct config_sesman *cfg)
 }
 
 /******************************************************************************/
-int
+/**
+ * Close all file descriptors used by sesman.
+ *
+ * This is generally used after forking, to make sure the
+ * file descriptors used by the main process are not disturbed
+ *
+ * This call will also :-
+ * - release all trans objects held by sesman
+ * - Delete sesman wait objects
+ * - Call sesman_delete_listening_transport()
+ */
+static int
 sesman_close_all(void)
 {
     LOG_DEVEL(LOG_LEVEL_TRACE, "sesman_close_all:");
