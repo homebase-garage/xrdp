@@ -58,6 +58,8 @@ sig_sesman_reload_cfg(void)
     {
         LOG(LOG_LEVEL_INFO, "sesman listen port changed to %s",
             cfg->listen_port);
+        LOG(LOG_LEVEL_WARNING,
+            "Restarting sesman will now lose active sessions");
 
         /* We have to delete the old port before listening to the new one
          * in case they overlap in scope */
