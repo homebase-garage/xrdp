@@ -87,7 +87,6 @@ static struct trans *g_list_trans;
 /* Variables used to lock g_list_trans */
 static struct lock_uds *g_list_trans_lock;
 
-static struct list *g_con_list = NULL;
 static int g_pid;
 
 /*****************************************************************************/
@@ -470,17 +469,10 @@ sesman_main_loop(void)
     int robjs_count;
     intptr_t robjs[1024];
 
-    g_con_list = list_create();
-    if (g_con_list == NULL)
-    {
-        LOG(LOG_LEVEL_ERROR, "sesman_main_loop: list_create failed");
-        return 1;
-    }
     if (sesman_create_listening_transport(g_cfg) != 0)
     {
         LOG(LOG_LEVEL_ERROR,
             "sesman_main_loop: sesman_create_listening_transport failed");
-        list_delete(g_con_list);
         return 1;
     }
     LOG(LOG_LEVEL_INFO, "Sesman now listening on %s", g_cfg->listen_port);
