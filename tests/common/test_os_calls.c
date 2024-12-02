@@ -7,6 +7,7 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <poll.h>
+#include <errno.h>
 
 #include "os_calls.h"
 #include "list.h"
@@ -19,6 +20,9 @@
 
 // File for testing ro/rw opens
 #define RO_RW_FILE "./test_ro_rw"
+
+// Directory for testing files
+#define TEST_READDIR "./test_readdir"
 
 /******************************************************************************/
 /***
@@ -488,6 +492,74 @@ START_TEST(test_g_sck_fd_overflow)
 END_TEST
 
 /******************************************************************************/
+static int qsort_func_strlist(const void *a, const void *b)
+{
+    return strcmp(*(const char **)a, *(const char **)b);
+}
+
+START_TEST(test_g_readdir)
+{
+    int status;
+    const char *entries[] = { "one", "two", "three", "four", "five", 0};
+    unsigned int count = 0;
+    const char **name;
+
+    // Don't check results of create dir, as we may be re-running this
+    // after a fail
+    (void)g_mkdir(TEST_READDIR);
+    // This should work though
+    status = g_set_current_dir(TEST_READDIR);
+    ck_assert_int_eq(status, 0);
+
+    // Create some files in the directory
+    for (name = entries; *name != NULL; ++name, ++count)
+    {
+        int fd = g_file_open_rw(*name);
+        ck_assert(fd >= 0);
+        g_file_close(fd);
+    }
+
+    // Can we read them, and are there the expected number?
+    struct list *dentries = g_readdir(".");
+    ck_assert_ptr_ne(dentries, NULL);
+    ck_assert_ptr_ne(dentries, NULL);
+    ck_assert_int_eq(dentries->count, count);
+
+    // Sort both lists according to the current locale
+    qsort(entries, count, sizeof(entries[0]), qsort_func_strlist);
+    qsort(dentries->items, count, sizeof(dentries->items[0]),
+          qsort_func_strlist);
+
+    // Check both lists are identical
+    int i;
+    for (i = 0 ; i < count; ++i)
+    {
+        ck_assert_str_eq(entries[i], (const char *)dentries->items[i]);
+    }
+
+    // Clean up
+    list_delete(dentries);
+    for (i = 0 ; i < count ; ++i)
+    {
+        g_file_delete(entries[i]);
+    }
+    g_set_current_dir("..");
+    status = g_remove_dir(TEST_READDIR); // Returns a boolean(?)
+    ck_assert_int_ne(status, 0);
+
+
+}
+END_TEST
+
+START_TEST(test_g_readdir_not_dir)
+{
+    struct list *dentries = g_readdir("NoSuchDirectory");
+    ck_assert_ptr_eq(dentries, 0);
+    ck_assert_int_eq(errno, ENOENT);
+}
+END_TEST
+
+/******************************************************************************/
 Suite *
 make_suite_test_os_calls(void)
 {
@@ -512,6 +584,8 @@ make_suite_test_os_calls(void)
     tcase_add_test(tc_os_calls, test_g_file_is_open);
     tcase_add_test(tc_os_calls, test_g_sck_fd_passing);
     tcase_add_test(tc_os_calls, test_g_sck_fd_overflow);
+    tcase_add_test(tc_os_calls, test_g_readdir);
+    tcase_add_test(tc_os_calls, test_g_readdir_not_dir);
 
     // Add other test cases in other files
     suite_add_tcase(s, make_tcase_test_os_calls_signals());

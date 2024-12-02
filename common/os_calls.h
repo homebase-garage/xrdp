@@ -440,6 +440,19 @@ void
 g_qsort(void *base, size_t nitems, size_t size,
         int (*compar)(const void *, const void *));
 
+/**
+ * Returns a list of the filenames contained within a directory
+ *
+ * @param dir Name of directory
+ * @return list of directory entry names
+ *
+ * If NULL is returned, further information may be available in errno. No
+ * other errors are specifically logged.
+ * The special files '.' and '..' are not returned.
+ */
+struct list *
+g_readdir(const char *dir);
+
 /** Set the out-of-memory handler
  * @param new_handler Function to call if a memory allocation fails
  * @result old handler or NULL if none.
