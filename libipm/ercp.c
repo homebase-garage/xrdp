@@ -81,6 +81,32 @@ ercp_trans_from_eicp_trans(struct trans *trans,
 
 /*****************************************************************************/
 
+struct trans *
+ercp_connect(const  char *port, int (*term_func)(void))
+{
+    struct trans *t;
+
+    if ((t = trans_create(TRANS_MODE_UNIX, 128, 128)) != NULL)
+    {
+        t->is_term = term_func;
+
+        if (trans_connect(t, NULL, port, 3000) != 0)
+        {
+            trans_delete(t);
+            t = NULL;
+        }
+        else if (ercp_init_trans(t) != 0)
+        {
+            trans_delete(t);
+            t = NULL;
+        }
+    }
+
+    return t;
+}
+
+/*****************************************************************************/
+
 int
 ercp_msg_in_check_available(struct trans *trans, int *available)
 {

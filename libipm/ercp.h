@@ -88,6 +88,16 @@ ercp_trans_from_eicp_trans(struct trans *trans,
                            ttrans_data_in callback_func,
                            void *callback_data);
 
+/**
+ * Connects to an ERCP endpoint.
+ *
+ * @param port Path to UDS object in filesystem
+ * @param term_func Function to poll during connection for program
+ *         termination, or NULL for none.
+ */
+struct trans *
+ercp_connect(const char *port,
+             int (*term_func)(void));
 
 /**
  * Checks an ERCP transport to see if a complete message is
