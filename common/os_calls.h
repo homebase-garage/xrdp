@@ -262,6 +262,7 @@ int      g_file_exist(const char *filename);
 int      g_file_readable(const char *filename);
 int      g_directory_exist(const char *dirname);
 int      g_executable_exist(const char *dirname);
+int      g_socket_exist(const char *dirname);
 int      g_create_dir(const char *dirname);
 int      g_create_path(const char *path);
 int      g_remove_dir(const char *dirname);

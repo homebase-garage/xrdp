@@ -2679,6 +2679,23 @@ g_executable_exist(const char *exename)
 }
 
 /*****************************************************************************/
+/* returns boolean, non zero if the socket exists */
+int
+g_socket_exist(const char *sockname)
+{
+    struct stat st;
+
+    if (stat(sockname, &st) == 0)
+    {
+        return S_ISSOCK(st.st_mode);
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+/*****************************************************************************/
 /* returns boolean */
 int
 g_create_dir(const char *dirname)
