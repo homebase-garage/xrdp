@@ -46,6 +46,7 @@
 #include "scp.h"
 #include "scp_process.h"
 #include "sesexec_control.h"
+#include "sesman_restart.h"
 #include "sig.h"
 #include "string_calls.h"
 #include "trans.h"
@@ -78,7 +79,7 @@ struct sesman_startup_params
 };
 
 struct config_sesman *g_cfg;
-static tintptr g_term_event = 0;
+tintptr g_term_event = 0;
 static tintptr g_sigchld_event = 0;
 static tintptr g_reload_event = 0;
 
@@ -945,7 +946,8 @@ main(int argc, char **argv)
     }
 
     if ((error = pre_session_list_init(MAX_PRE_SESSION_ITEMS)) == 0 &&
-            (error = session_list_init()) == 0)
+            (error = session_list_init()) == 0 &&
+            (error = sesman_restart_discover_sessions()) == 0)
     {
         error = sesman_main_loop();
     }

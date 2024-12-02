@@ -32,6 +32,8 @@ xrdp_sesman_SOURCES = \
   sesexec_control.h \
   session_list.c \
   session_list.h \
+  sesman_restart.c \
+  sesman_restart.h \
   sig.c \
   sig.h
 

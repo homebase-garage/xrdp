@@ -32,6 +32,7 @@ struct trans;
 
 /* Globals */
 extern struct config_sesman *g_cfg;
+extern tintptr g_term_event;
 
 /*
  * Remove the listening transport
