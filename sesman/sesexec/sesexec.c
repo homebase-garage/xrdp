@@ -38,6 +38,7 @@
 #include "ercp_server.h"
 #include "login_info.h"
 #include "sesexec.h"
+#include "sesexec_discover.h"
 #include "sesman_config.h"
 #include "log.h"
 #include "os_calls.h"
@@ -209,8 +210,12 @@ sesexec_is_term(void)
 void
 sesexec_terminate_main_loop(int status)
 {
-    g_terminate_loop = 1;
-    g_terminate_status = status;
+    // Only take the first request to terminate the loop
+    if (!g_terminate_loop)
+    {
+        g_terminate_loop = 1;
+        g_terminate_status = status;
+    }
 }
 
 /******************************************************************************/
@@ -228,6 +233,45 @@ process_sigchld_event(void)
 }
 
 /******************************************************************************/
+static void
+sesexec_terminate_session_and_wait(void)
+{
+    session_send_term(g_session_data);
+    do
+    {
+        g_sleep(1000);
+        // Process SIGCHLD events while waiting for the session
+        // to exit.
+        if (g_is_wait_obj_set(g_sigchld_event))
+        {
+            g_reset_wait_obj(g_sigchld_event);
+            process_sigchld_event();
+        }
+    }
+    while (session_active(g_session_data));
+}
+
+/******************************************************************************/
+static void
+sesexec_main_loop_cleanup(void)
+{
+    login_info_free(g_login_info);
+
+    /* This session is no longer discoverable */
+    sesexec_discover_disable();
+
+    /* Don't allow sesexec to terminate with an active
+       session, as we can't connect to such a session */
+    if (session_active(g_session_data))
+    {
+        LOG(LOG_LEVEL_INFO,
+            "Stopping session on xrdp-sesexec exit");
+        sesexec_terminate_session_and_wait();
+    }
+    session_data_free(g_session_data);
+}
+
+/******************************************************************************/
 /**
  *
  * @brief Starts sesexec main loop
@@ -238,7 +282,8 @@ sesexec_main_loop(void)
 {
     int error = 0;
     int robjs_count;
-    intptr_t robjs[32];
+#define MAX_ROBJS 32
+    intptr_t robjs[MAX_ROBJS];
 
     g_terminate_loop = 0;
     g_terminate_status = 0;
@@ -250,11 +295,25 @@ sesexec_main_loop(void)
         robjs[robjs_count++] = g_term_event;
         robjs[robjs_count++] = g_sigchld_event;
 
-        error = trans_get_wait_objs(g_ecp_trans, robjs, &robjs_count);
+        // ECP transport may be null if sesman has gone away
+        if (g_ecp_trans != NULL)
+        {
+            error = trans_get_wait_objs(g_ecp_trans, robjs, &robjs_count);
+            if (error != 0)
+            {
+                LOG(LOG_LEVEL_ERROR, "sesexec_main_loop: "
+                    "trans_get_wait_objs(ECP) failed");
+                sesexec_terminate_main_loop(error);
+                continue;
+            }
+        }
+
+        // Add any objects from the discover module
+        error = sesexec_discover_get_wait_objs(robjs, &robjs_count, MAX_ROBJS);
         if (error != 0)
         {
             LOG(LOG_LEVEL_ERROR, "sesexec_main_loop: "
-                "trans_get_wait_objs(ECP) failed");
+                "sesexec_discover_get_wait_objs() failed");
             sesexec_terminate_main_loop(error);
             continue;
         }
@@ -273,21 +332,17 @@ sesexec_main_loop(void)
             g_reset_wait_obj(g_term_event);
             if (session_active(g_session_data))
             {
-                // Ask the active session to terminate
                 LOG(LOG_LEVEL_INFO, "sesexec_main_loop: "
-                    "sesexec asked to terminate. "
-                    "Terminating active session");
-                session_send_term(g_session_data);
+                    "sesexec asked to terminate with active session.");
             }
             else
             {
-                // Terminate immediately
                 LOG(LOG_LEVEL_INFO, "sesexec_main_loop: "
                     "sesexec asked to terminate. "
                     "No session is active");
-                sesexec_terminate_main_loop(0);
-                continue;
             }
+            sesexec_terminate_main_loop(0);
+            continue;
         }
 
         if (g_is_wait_obj_set(g_sigchld_event)) /* SIGCHLD */
@@ -302,7 +357,10 @@ sesexec_main_loop(void)
             {
                 // We've finished the session. Tell sesman and
                 // finish up.
-                (void)ercp_send_session_finished_event(g_ecp_trans);
+                if (g_ecp_trans != NULL)
+                {
+                    (void)ercp_send_session_finished_event(g_ecp_trans);
+                }
 
                 session_data_free(g_session_data);
                 g_session_data = NULL;
@@ -311,19 +369,51 @@ sesexec_main_loop(void)
             }
         }
 
-        error = trans_check_wait_objs(g_ecp_trans);
+        if (g_ecp_trans != NULL)
+        {
+            error = trans_check_wait_objs(g_ecp_trans);
+            if (error != 0)
+            {
+                if (g_ecp_trans->status != TRANS_STATUS_UP &&
+                        session_active(g_session_data))
+                {
+                    // sesman has gone away. We have an active session
+                    // to keep track of, so sesman can pick it up when it
+                    // restarts
+                    LOG(LOG_LEVEL_INFO, "sesexec_main_loop: "
+                        "sesman has exited");
+                    trans_delete(g_ecp_trans);
+                    g_ecp_trans = NULL;
+                }
+                else
+                {
+                    // A callback has failed, or sesman has gone away and
+                    // we have no active session
+                    LOG(LOG_LEVEL_ERROR, "sesexec_main_loop: "
+                        "trans_check_wait_objs failed for ECP transport");
+                    sesexec_terminate_main_loop(error);
+                }
+                continue;
+            }
+        }
+
+        error = sesexec_discover_check_wait_objs();
         if (error != 0)
         {
             LOG(LOG_LEVEL_ERROR, "sesexec_main_loop: "
-                "trans_check_wait_objs failed for ECP transport");
+                "sesexec_discover_check_wait_objs failed");
             sesexec_terminate_main_loop(error);
             continue;
         }
+
     }
 
-    login_info_free(g_login_info);
+    /* close sesman communications immediately */
+    trans_delete(g_ecp_trans);
+    g_ecp_trans = NULL;
 
     return g_terminate_status;
+#undef MAX_ROBJS
 }
 
 /******************************************************************************/
@@ -483,9 +573,8 @@ main(int argc, char **argv)
                 /* start program main loop */
                 LOG(LOG_LEVEL_INFO, "starting xrdp-sesexec with pid %d", g_pid);
                 error = sesexec_main_loop();
-                trans_delete(g_ecp_trans);
+                sesexec_main_loop_cleanup();
             }
-
             g_delete_wait_obj(g_term_event);
         }
         config_free(g_cfg);
