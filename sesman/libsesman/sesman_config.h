@@ -189,8 +189,11 @@ struct config_sesman
     /**
      * @var listen_port
      * @brief Listening port
+     *
+     * This string is used to form the restart directory name, so
+     * can't be the full XRDP_SOCKETS_MAXPATH length.
      */
-    char listen_port[XRDP_SOCKETS_MAXPATH];
+    char listen_port[XRDP_SOCKETS_MAXPATH - 10];
     /**
      * @var enable_user_wm
      * @brief Flag that enables user specific wm
