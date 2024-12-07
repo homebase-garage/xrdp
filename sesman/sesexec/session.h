@@ -103,9 +103,22 @@ session_active(const struct session_data *sd);
  * Returns the start time for an active session
  *
  * @param sd session_data for this session
+ * @return session start time
  */
 time_t
 session_get_start_time(const struct session_data *sd);
+
+/**
+ * Returns the parameters used to start the session
+ *
+ * @param sd session_data for this session
+ * @return Pointer to parameters
+ *
+ * The pointed-to data returned must not be modified in
+ * any way.
+ */
+const struct session_parameters *
+session_get_parameters(const struct session_data *sd);
 
 /***
  * Ask a session to terminate by signalling the window manager
