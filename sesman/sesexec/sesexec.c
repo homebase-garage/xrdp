@@ -120,30 +120,6 @@ process_params(int argc, char **argv,
 }
 
 /******************************************************************************/
-#if 0
-static int
-sesexec_scp_data_in(struct trans *self)
-{
-    int rv;
-    int available;
-
-    rv = scp_msg_in_check_available(self, &available);
-
-    if (rv == 0 && available)
-    {
-        struct sesman_con *sc = (struct sesman_con *)self->callback_data;
-        //if ((rv = scp_process(sc)) != 0)
-        {
-            LOG(LOG_LEVEL_ERROR, "%s: scp_process failed", __func__);
-        }
-        scp_msg_in_reset(self);
-    }
-
-    return rv;
-}
-#endif
-
-/******************************************************************************/
 static int
 sesexec_eicp_data_in(struct trans *self)
 {
