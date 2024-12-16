@@ -68,6 +68,7 @@ pid_t g_pid;
  * Module-scope globals
  */
 static struct trans *g_ecp_trans;
+static pid_t g_ecp_pid;
 static int g_terminate_loop = 0;
 static int g_terminate_status = 0;
 
@@ -216,6 +217,53 @@ sesexec_terminate_main_loop(int status)
         g_terminate_loop = 1;
         g_terminate_status = status;
     }
+}
+
+/******************************************************************************/
+int
+sesexec_set_ecp_transport(struct trans *t)
+{
+    int rv;
+    int pid;
+    int uid;
+    int gid;
+
+    if (t == NULL)
+    {
+        trans_delete(g_ecp_trans);
+        g_ecp_trans = NULL;
+        g_ecp_pid = 0;
+        rv = 0;
+    }
+    else if ((rv = g_sck_get_peer_cred(t->sck, &pid, &uid, &gid)) != 0)
+    {
+        LOG(LOG_LEVEL_ERROR, "Can't get credentials of sesman socket [%s]",
+            g_get_strerror());
+    }
+    else if (uid != 0 || gid != 0)
+    {
+        LOG(LOG_LEVEL_ERROR, "sesman PID %d is running as UID:GID %d:%d",
+            pid, uid, gid);
+        rv = 1;
+    }
+    else
+    {
+        trans_delete(g_ecp_trans);
+        g_ecp_trans = t;
+        g_ecp_pid = pid;
+        rv = 0;
+    }
+
+    return rv;
+}
+
+/******************************************************************************/
+int
+sesexec_is_ecp_active(void)
+{
+    return (g_ecp_trans != NULL &&
+            g_ecp_pid != 0 && g_pid_is_active(g_ecp_pid));
+
 }
 
 /******************************************************************************/
@@ -382,8 +430,7 @@ sesexec_main_loop(void)
                     // restarts
                     LOG(LOG_LEVEL_INFO, "sesexec_main_loop: "
                         "sesman has exited");
-                    trans_delete(g_ecp_trans);
-                    g_ecp_trans = NULL;
+                    sesexec_set_ecp_transport(NULL);
                 }
                 else
                 {
@@ -409,8 +456,7 @@ sesexec_main_loop(void)
     }
 
     /* close sesman communications immediately */
-    trans_delete(g_ecp_trans);
-    g_ecp_trans = NULL;
+    sesexec_set_ecp_transport(NULL);
 
     return g_terminate_status;
 #undef MAX_ROBJS
@@ -542,6 +588,7 @@ main(int argc, char **argv)
         else
         {
             char text[128];
+            struct trans *t;
 
             g_pid = g_getpid();
 
@@ -562,10 +609,10 @@ main(int argc, char **argv)
 
             /* Set up an EICP process handler
              * Errors are logged by this call if necessary */
-            g_ecp_trans = eicp_init_trans_from_fd(eicp_fd,
-                                                  TRANS_TYPE_SERVER,
-                                                  sesexec_is_term);
-            if (g_ecp_trans != NULL)
+            t = eicp_init_trans_from_fd(eicp_fd,
+                                        TRANS_TYPE_SERVER,
+                                        sesexec_is_term);
+            if (t != NULL && sesexec_set_ecp_transport(t) == 0)
             {
                 g_ecp_trans->trans_data_in = sesexec_eicp_data_in;
                 g_ecp_trans->callback_data = NULL;
