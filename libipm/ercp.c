@@ -208,10 +208,7 @@ ercp_get_session_announce_event(struct trans *trans,
 
     if (rv == 0)
     {
-        if (display != NULL)
-        {
-            *display = i_display;
-        }
+        *display = i_display;
         *uid = (uid_t)i_uid;
         *type = (enum scp_session_type)i_type;
         *start_width = i_width;

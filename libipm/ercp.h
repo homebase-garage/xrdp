@@ -188,7 +188,6 @@ ercp_send_session_announce_event(struct trans *trans,
  *
  * @param trans EICP transport
  * @param[out] display Display used by session.
- *             Pointer can be NULL if this is already known.
  * @param[out] uid UID of user logged in to session
  * @param[out] type Session type
  * @param[out] start_width Starting width of seenio

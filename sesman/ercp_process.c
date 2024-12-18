@@ -42,9 +42,10 @@ process_session_announce_event(struct session_item *si)
 {
     int rv;
     const char *start_ip_addr;
+    unsigned int display;
 
     rv = ercp_get_session_announce_event(si->sesexec_trans,
-                                         NULL,
+                                         &display,
                                          &si->uid,
                                          &si->type,
                                          &si->start_width,
@@ -55,8 +56,22 @@ process_session_announce_event(struct session_item *si)
                                          &si->start_time);
     if (rv == 0)
     {
+        // We may already know the display we sent sesexec. If we do,
+        // check sesexec sent the same value back.
+        if (si->display >= 0 && display != (unsigned int)si->display)
+        {
+            LOG(LOG_LEVEL_ERROR, "Bugcheck: sesman expected display %d, got %u",
+                si->display, display);
+            rv = 1;
+        }
+    }
+
+    if (rv == 0)
+    {
         snprintf(si->start_ip_addr, sizeof(si->start_ip_addr),
                  "%s", start_ip_addr);
+        si->display = display;
+
         si->state = E_SESSION_RUNNING;
     }
 
