@@ -11,6 +11,13 @@ EnvironmentFile=-@sysconfdir@/default/xrdp
 ExecStart=@sbindir@/xrdp $XRDP_OPTIONS --nodaemon
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
+# Uncomment the following line if you wish xrdp connections to survive
+# an xrdp restart.
+#
+# This is not recommended, as the xrdp and xrdp-sesman processes can
+# end up with API differences if the restart was caused by an upgrade. It
+# may however be useful for some use cases.
+#KillMode=process
 
 [Install]
 WantedBy=multi-user.target
