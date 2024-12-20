@@ -37,7 +37,8 @@ Valid commands are:
 .RS 4
 .TP
 .B list
-List active sessions for the current user.
+List active sessions for the current user.  Members of the
+\fBTerminalServerAdmins\fR group can view active sessions for all users.
 .TP
 .BI kill: sid
 Kills the session specified the given \fIsession id\fP.

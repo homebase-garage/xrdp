@@ -204,11 +204,21 @@ authenticate_and_authorize_uds_connection(struct pre_session_item *psi,
             }
             else
             {
-                LOG(LOG_LEVEL_INFO, "Access permitted for user: %s",
-                    username);
                 psi->login_state = E_PS_LOGIN_UDS;
                 psi->uid = uid;
                 psi->start_ip_addr[0] = '\0';
+                psi->is_admin = access_login_is_admin(&g_cfg->sec,
+                                                      psi->username);
+                if (psi->is_admin)
+                {
+                    LOG(LOG_LEVEL_INFO, "Admin access permitted for user: %s",
+                        username);
+                }
+                else
+                {
+                    LOG(LOG_LEVEL_INFO, "Normal access permitted for user: %s",
+                        username);
+                }
             }
         }
 
@@ -555,7 +565,14 @@ process_list_sessions_request(struct pre_session_item *psi)
             "Received request from %s to list sessions for user %s",
             psi->peername, psi->username);
 
-        info = session_list_get_byuid(psi->uid, &cnt, 0);
+        if (psi->is_admin)
+        {
+            info = session_list_get_byuid(NULL, &cnt, 0);
+        }
+        else
+        {
+            info = session_list_get_byuid(&psi->uid, &cnt, 0);
+        }
 
         for (i = 0; rv == 0 && i < cnt; ++i)
         {

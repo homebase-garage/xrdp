@@ -271,8 +271,9 @@ login for all users is enabled.
 
 .TP
 \fBTerminalServerAdmins\fR=\fIgroup\fR
-\fIThis option is currently ignored!\fR Only members of this group can
-have session management rights.
+Members of this group can use the \fBxrdp-sesadmin\fR command to
+administer sessions started by other users. The root user is always
+considered to be in this group.
 
 .TP
 \fBRestrictOutboundClipboard\fR=\fI[all|none|text|file|image]\fR
@@ -334,8 +335,16 @@ To keep compatibility, the following aliases are also available.
 
 .TP
 \fBAlwaysGroupCheck\fR=\fI[true|false]\fR
-If set to \fB1\fR, \fBtrue\fR or \fByes\fR, require group membership even
-if the group specified in \fBTerminalServerUsers\fR doesn't exist.
+If set to \fB1\fR, \fBtrue\fR or \fByes\fR:-
+.RS
+.HP 3
+- For normal logins, require group membership even if the group specified
+in \fBTerminalServerUsers\fR doesn't exist.
+.HP 3
+- An error message may be generated when any user authenticates
+if the group specified in \fBTerminalServerAdmins\fR doesn't exist. This is
+because the system is unable to check whether the user is an administrator.
+.RE
 
 .TP
 \fBAllowAlternateShell\fR=\fI[true|false]\fR

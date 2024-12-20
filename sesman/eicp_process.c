@@ -36,6 +36,8 @@
 #include "pre_session_list.h"
 #include "scp.h"
 #include "sesman.h"
+#include "sesman_access.h"
+#include "sesman_config.h"
 
 /******************************************************************************/
 
@@ -79,6 +81,10 @@ process_sys_login_response(struct pre_session_item *psi)
                 psi->client_trans->callback_data = (void *)psi;
                 psi->login_state = E_PS_LOGIN_SYS;
                 psi->uid = uid;
+                // For system logins, don't allow admin access
+                //psi->is_admin = access_login_mng_allowed(&g_cfg->sec,
+                //                psi->username);
+                psi->is_admin = 0;
             }
         }
     }

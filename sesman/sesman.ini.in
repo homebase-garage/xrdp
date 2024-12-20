@@ -18,7 +18,8 @@ XAuthorityInSystemDir=no
 TerminalServerUsers=tsusers
 TerminalServerAdmins=tsadmins
 ; When AlwaysGroupCheck=false access will be permitted
-; if the group TerminalServerUsers is not defined.
+; if the group TerminalServerUsers is not defined, and the
+; non-existence of TerminalServerAdmins will not be reported
 AlwaysGroupCheck=false
 ; When RestrictOutboundClipboard=all clipboard from the
 ; server is not pushed to the client.
