@@ -162,6 +162,12 @@ env_set_user(int uid, char **passwd_file, int display,
             /* pulse source socket */
             g_snprintf(text, sizeof(text), CHANSRV_PORT_IN_BASE_STR, display);
             g_setenv("XRDP_PULSE_SOURCE_SOCKET", text, 1);
+            if (g_cfg->sec.xauth_in_sysdir)
+            {
+                g_snprintf(text, sizeof(text), XRDP_SOCKET_PATH "/Xauthority",
+                           uid);
+                g_setenv("XAUTHORITY", text, 1);
+            }
             if ((env_names != 0) && (env_values != 0) &&
                     (env_names->count == env_values->count))
             {

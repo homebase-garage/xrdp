@@ -252,6 +252,14 @@ to \fI0\fR, unlimited attempts are allowed. If not specified, defaults to
 \fI3\fR.
 
 .TP
+\fBXAuthorityInSystemDir\fR=\fI[no|yes]\fR
+If set to \fByes\fR, xrdp will set XAUTHORITY to be in a system directory
+(currently @socketdir@/\fI<uid>\fR) which is only accessible to the
+logged-in user.
+You may wish to use this if $HOME is NFS-mounted, or you are experiencing
+other applications overwriting the default file.
+
+.TP
 \fBTerminalServerUsers\fR=\fIgroup\fR
 Only the users belonging to the specified group are allowed to login on
 terminal server. If unset or set to an invalid or non\-existent group,

@@ -63,6 +63,7 @@
 */
 #define SESMAN_CFG_SECURITY                        "Security"
 #define SESMAN_CFG_SEC_LOGIN_RETRY                 "MaxLoginRetry"
+#define SESMAN_CFG_XAUTH_IN_SYSDIR                 "XAuthorityInSystemDir"
 #define SESMAN_CFG_SEC_ALLOW_ROOT                  "AllowRootLogin"
 #define SESMAN_CFG_SEC_USR_GROUP                   "TerminalServerUsers"
 #define SESMAN_CFG_SEC_ADM_GROUP                   "TerminalServerAdmins"
@@ -307,6 +308,7 @@ config_read_security(int file, struct config_security *sc,
     /* setting defaults */
     sc->allow_root = 0;
     sc->login_retry = 3;
+    sc->xauth_in_sysdir = 0;
     sc->restrict_outbound_clipboard = 0;
     sc->restrict_inbound_clipboard = 0;
     sc->allow_alternate_shell = 1;
@@ -329,6 +331,10 @@ config_read_security(int file, struct config_security *sc,
         else if (0 == g_strcasecmp(buf, SESMAN_CFG_SEC_LOGIN_RETRY))
         {
             sc->login_retry = g_atoi(value);
+        }
+        else if (0 == g_strcasecmp(buf, SESMAN_CFG_XAUTH_IN_SYSDIR))
+        {
+            sc->xauth_in_sysdir = g_text2bool(value);
         }
         else if (0 == g_strcasecmp(buf, SESMAN_CFG_SEC_USR_GROUP))
         {
@@ -672,6 +678,7 @@ config_dump(struct config_sesman *config)
     g_writeln("Security configuration:");
     g_writeln("    AllowRootLogin:            %d", sc->allow_root);
     g_writeln("    MaxLoginRetry:             %d", sc->login_retry);
+    g_writeln("    XAuthorityInSystemDir:     %d", sc->xauth_in_sysdir);
     g_writeln("    AlwaysGroupCheck:          %d", sc->ts_always_group_check);
     g_writeln("    AllowAlternateShell:       %d", sc->allow_alternate_shell);
 #ifdef HAVE_SYS_PRCTL_H
