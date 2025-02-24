@@ -40,7 +40,8 @@ void
 list16_init(struct list16 *self);
 void
 list16_deinit(struct list16 *self);
-void
+/* Returns != 0 if item added successfully */
+int
 list16_add_item(struct list16 *self, tui16 item);
 tui16
 list16_get_item(struct list16 *self, int index);
@@ -50,7 +51,8 @@ int
 list16_index_of(struct list16 *self, tui16 item);
 void
 list16_remove_item(struct list16 *self, int index);
-void
+/* Returns != 0 if item added successfully */
+int
 list16_insert_item(struct list16 *self, int index, tui16 item);
 
 #endif

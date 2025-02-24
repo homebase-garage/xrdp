@@ -70,27 +70,64 @@ list16_deinit(struct list16 *self)
 }
 
 /*****************************************************************************/
-void
-list16_add_item(struct list16 *self, tui16 item)
+/**
+ * Makes the data array larger
+ *
+ * @param self The list
+ * @return 1 for success, 0 for failure
+ *
+ * On failure, the data array is unchanged
+ */
+static int
+expand_array(struct list16 *self)
 {
     tui16 *p;
     int i;
-
-    if (self->count >= self->max_count)
+    int new_max_count = self->max_count + 4;
+    if (self->items == self->mitems)
     {
-        i = self->max_count;
-        self->max_count += 4;
-        p = (tui16 *)g_malloc(sizeof(tui16) * self->max_count, 1);
-        g_memcpy(p, self->items, sizeof(tui16) * i);
-        if (self->items != self->mitems)
+        /* Previous allocation is static. Make a new dynamic allocation */
+        p = (tui16 *)malloc(sizeof(tui16) * new_max_count);
+        if (p == NULL)
         {
-            g_free(self->items);
+            return 0;
         }
-        self->items = p;
+        g_memcpy(p, self->items, sizeof(tui16) * self->max_count);
+    }
+    else
+    {
+        /* Try to reallocate the existing array */
+        p = (tui16 *)realloc(self->items, sizeof(tui16) * new_max_count);
+        if (p == NULL)
+        {
+            return 0;
+        }
+    }
+
+    /* Clear the new elements */
+    for (i = self->max_count; i < new_max_count; ++i)
+    {
+        p[i] = 0;
+    }
+
+    self->max_count = new_max_count;
+    self->items = p;
+
+    return 1;
+}
+
+/*****************************************************************************/
+int
+list16_add_item(struct list16 *self, tui16 item)
+{
+    if (self->count >= self->max_count && !expand_array(self))
+    {
+        return 0;
     }
 
     self->items[self->count] = item;
     self->count++;
+    return 1;
 }
 
 /*****************************************************************************/
@@ -153,40 +190,22 @@ list16_remove_item(struct list16 *self, int index)
 }
 
 /*****************************************************************************/
-void
+int
 list16_insert_item(struct list16 *self, int index, tui16 item)
 {
-    tui16 *p;
-    int i;
-
-    if (index == self->count)
+    /* Make sure there's at least one free element in the array */
+    if (self->count >= self->max_count && !expand_array(self))
     {
-        list16_add_item(self, item);
-        return;
+        return 0;
     }
 
-    if (index >= 0 && index < self->count)
+    if (index < self->count)
     {
-        self->count++;
-
-        if (self->count > self->max_count)
-        {
-            i = self->max_count;
-            self->max_count += 4;
-            p = (tui16 *)g_malloc(sizeof(tui16) * self->max_count, 1);
-            g_memcpy(p, self->items, sizeof(tui16) * i);
-            if (self->items != self->mitems)
-            {
-                g_free(self->items);
-            }
-            self->items = p;
-        }
-
-        for (i = (self->count - 2); i >= index; i--)
-        {
-            self->items[i + 1] = self->items[i];
-        }
-
-        self->items[index] = item;
+        memmove(&self->items[index + 1], &self->items[index],
+                (self->count - index) * sizeof(tui16));
     }
+
+    self->items[index] = item;
+    self->count++;
+    return 1;
 }

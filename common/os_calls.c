@@ -138,6 +138,9 @@ union sock_info
 #endif
 };
 
+/******************************************************************************/
+static oom_type g_out_of_memory_handler;
+
 /*****************************************************************************/
 int
 g_rm_temp_dir(void)
@@ -3971,7 +3974,7 @@ g_save_to_bmp(const char *filename, char *data, int stride_bytes,
     data -= stride_bytes;
     if ((depth == 24) && (bits_per_pixel == 32))
     {
-        line = (char *) malloc(file_stride_bytes);
+        line = (char *) g_malloc_nofail(file_stride_bytes);
         memset(line, 0, file_stride_bytes);
         for (index = 0; index < height; index++)
         {
@@ -4275,4 +4278,57 @@ g_qsort(void *base, size_t nitems, size_t size,
         int (*compar)(const void *, const void *))
 {
     qsort(base, nitems, size, compar);
+}
+
+/******************************************************************************/
+oom_type
+g_set_out_of_memory_handler(oom_type new_handler)
+{
+    oom_type old_handler = g_out_of_memory_handler;
+    g_out_of_memory_handler = new_handler;
+    return old_handler;
+}
+
+/******************************************************************************/
+static void
+out_of_memory(void)
+{
+    if (g_out_of_memory_handler != NULL)
+    {
+        g_out_of_memory_handler();
+        _exit(1);
+    }
+    else
+    {
+        abort();
+    }
+}
+
+/******************************************************************************/
+void *
+g_malloc_nofail(size_t size)
+{
+    void *res = malloc(size);
+    if (res == NULL)
+    {
+        LOG(LOG_LEVEL_ALWAYS, "g_malloc_nofail() can't allocate %zu bytes",
+            size);
+        out_of_memory();
+    }
+    return res;
+}
+
+/******************************************************************************/
+void *
+g_calloc_nofail(size_t nmemb, size_t size)
+{
+    void *res = calloc(nmemb, size);
+    if (res == NULL)
+    {
+        LOG(LOG_LEVEL_ALWAYS,
+            "g_calloc_nofail() can't allocate %zu * %zu bytes",
+            nmemb, size);
+        out_of_memory();
+    }
+    return res;
 }
