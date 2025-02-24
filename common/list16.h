@@ -36,8 +36,11 @@ struct list16 *
 list16_create(void);
 void
 list16_delete(struct list16 *self);
+/* Initialise a stack-based list16 */
 void
 list16_init(struct list16 *self);
+/* Free any memory allocated to a list16.
+ * After this call, list16_init() must be called again to re-use the list */
 void
 list16_deinit(struct list16 *self);
 /* Returns != 0 if item added successfully */

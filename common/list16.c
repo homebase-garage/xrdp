@@ -66,6 +66,7 @@ list16_deinit(struct list16 *self)
     if (self->items != self->mitems)
     {
         g_free(self->items);
+        self->items = self->mitems; // Prevent double=free
     }
 }
 
