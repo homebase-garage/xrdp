@@ -672,7 +672,7 @@ SCardStatus(SCARDHANDLE hCard, LPSTR mszReaderName, LPDWORD pcchReaderLen,
     LLOGLN(10, ("  cbAtrLen %d", (int)*pcbAtrLen));
 
     cchReaderLen = *pcchReaderLen;
-    msg = (char *) malloc(8192);
+    msg = (char *) g_malloc_nofail(8192);
     SET_UINT32(msg, 0, hCard);
     SET_UINT32(msg, 4, cchReaderLen);
     SET_UINT32(msg, 8, *pcbAtrLen);
@@ -761,7 +761,7 @@ SCardGetStatusChange(SCARDCONTEXT hContext, DWORD dwTimeout,
         LLOGLN(0, ("SCardGetStatusChange: error, not connected"));
         return SCARD_F_INTERNAL_ERROR;
     }
-    msg = (char *) malloc(8192);
+    msg = (char *) g_malloc_nofail(8192);
     SET_UINT32(msg, 0, hContext);
     SET_UINT32(msg, 4, dwTimeout);
     SET_UINT32(msg, 8, cReaders);
@@ -910,7 +910,7 @@ SCardControl(SCARDHANDLE hCard, DWORD dwControlCode, LPCVOID pbSendBuffer,
     dwControlCode = dwControlCode | (49 << 16);
     LLOGLN(10, ("  MS dwControlCode 0x%8.8d", (int)dwControlCode));
 
-    msg = (char *) malloc(8192);
+    msg = (char *) g_malloc_nofail(8192);
     offset = 0;
     SET_UINT32(msg, offset, hCard);
     offset += 4;
@@ -986,7 +986,7 @@ SCardTransmit(SCARDHANDLE hCard, const SCARD_IO_REQUEST *pioSendPci,
         LLOGLN(10, ("    pioRecvPci->dwProtocol %d", (int)(pioRecvPci->dwProtocol)));
         LLOGLN(10, ("    pioRecvPci->cbPciLength %d", (int)(pioRecvPci->cbPciLength)));
     }
-    msg = (char *) malloc(8192);
+    msg = (char *) g_malloc_nofail(8192);
     offset = 0;
     SET_UINT32(msg, offset, hCard);
     offset += 4;
@@ -1124,7 +1124,7 @@ SCardListReaders(SCARDCONTEXT hContext, LPCSTR mszGroups, LPSTR mszReaders,
     {
         *pcchReaders = 0;
     }
-    msg = (char *) malloc(8192);
+    msg = (char *) g_malloc_nofail(8192);
     offset = 0;
     SET_UINT32(msg, offset, hContext);
     offset += 4;
@@ -1171,7 +1171,7 @@ SCardListReaders(SCARDCONTEXT hContext, LPCSTR mszGroups, LPSTR mszReaders,
     offset += 4;
     LLOGLN(10, ("SCardListReaders: mszReaders %p pcchReaders %p num_readers %d",
                 mszReaders, pcchReaders, num_readers));
-    reader_names = (char *) malloc(8192);
+    reader_names = (char *) g_malloc_nofail(8192);
     reader_names_index = 0;
     for (index = 0; index < num_readers; index++)
     {

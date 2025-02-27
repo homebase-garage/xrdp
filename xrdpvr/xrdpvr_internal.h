@@ -90,6 +90,10 @@ typedef struct stream
     do                                                \
     {                                                 \
         (_s) = (STREAM *) calloc(1, sizeof(STREAM));  \
+        if (!(_s))                                    \
+        {                                             \
+            abort();                                  \
+        }                                             \
         (_s)->data = (u8 *) calloc(1, (_len));        \
         (_s)->p = (_s)->data;                         \
         (_s)->size = (_len);                          \

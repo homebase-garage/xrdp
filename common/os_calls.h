@@ -38,6 +38,9 @@ struct proc_exit_status
 
 struct list;
 
+/** Out-of-memory handler type */
+typedef void (*oom_type)(void);
+
 #define g_tcp_can_recv g_sck_can_recv
 #define g_tcp_can_send g_sck_can_send
 #define g_tcp_recv g_sck_recv
@@ -429,14 +432,57 @@ void
 g_qsort(void *base, size_t nitems, size_t size,
         int (*compar)(const void *, const void *));
 
+/** Set the out-of-memory handler
+ * @param new_handler Function to call if a memory allocation fails
+ * @result old handler or NULL if none.
+ *
+ * After calling an out-of-memory handler, the program exits
+ * If no out-of-memory handler is set, the program aborts
+ *
+ * Only use this function if there is urgent cleaning-up that must be done
+ * before the program exits.
+ */
+oom_type
+g_set_out_of_memory_handler(oom_type new_handler);
+
+/** Allocate memory with error-checking
+ *
+ * @param size Size of memory to allocate
+ * @return Allocated memory
+ *
+ * If memory cannot be allocated, the out-of-memory handler is called and
+ * the program exits
+ *
+ * Only use this function if you are unable to handle an out-of-memory
+ * condition.
+ */
+void *
+g_malloc_nofail(size_t size);
+
+/** Allocate memory with error-checking
+ *
+ * @param Number of elementst to allocate
+ * @param size Size of each element
+ * @return Allocated memory
+ *
+ * If memory cannot be allocated, the out-of-memory handler is called and
+ * the program exits
+ *
+ * Only use this function if you are unable to handle an out-of-memory
+ * condition.
+ */
+void *
+g_calloc_nofail(size_t nmemb, size_t size);
+
 /* glib-style wrappers */
 #define g_new(struct_type, n_structs) \
-    (struct_type *) malloc(sizeof(struct_type) * (n_structs))
+    (struct_type *) g_malloc_nofail(sizeof(struct_type) * (n_structs))
 #define g_new0(struct_type, n_structs) \
-    (struct_type *) calloc((n_structs), sizeof(struct_type))
+    (struct_type *) g_calloc_nofail((n_structs), sizeof(struct_type))
 
 /* remove these when no longer used */
-#define g_malloc(_size, _zero) (_zero ? calloc(1, _size) : malloc(_size))
+#define g_malloc(_size, _zero) \
+    (_zero ? g_calloc_nofail(1, _size) : g_malloc_nofail(_size))
 #define g_free free
 #define g_memset memset
 #define g_memcpy memcpy
