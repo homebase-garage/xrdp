@@ -933,7 +933,12 @@ main(int argc, char **argv)
             LOG(LOG_LEVEL_ERROR,
                 "sesman.c: error creating dir " X11_UNIX_SOCKET_DIRECTORY);
         }
-        g_chmod_hex(X11_UNIX_SOCKET_DIRECTORY, 0x1777);
+        if (g_chmod_hex(X11_UNIX_SOCKET_DIRECTORY, 0x1777) != 0)
+        {
+            LOG(LOG_LEVEL_ERROR,
+                "sesman.c: can't set permissions on "
+                X11_UNIX_SOCKET_DIRECTORY "[%s]", g_get_strerror());
+        }
     }
 
     if ((error = pre_session_list_init(MAX_PRE_SESSION_ITEMS)) == 0 &&
