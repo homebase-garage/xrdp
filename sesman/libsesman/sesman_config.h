@@ -69,6 +69,12 @@ struct config_security
      */
     int login_retry;
     /**
+     * @var x_authority_in_system_dir
+     * @brief Move XAUTHORITY to a system directory
+     */
+    int xauth_in_sysdir;
+
+    /**
      * @var ts_users
      * @brief Terminal Server Users group
      */

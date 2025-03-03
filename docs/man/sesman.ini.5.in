@@ -57,7 +57,7 @@ In this instance, the system administrator is responsible for ensuring
 the socket can only be created by a suitably privileged process.
 .PP
 If the parameter does not start with a '/', a name within
-@socketdir@ is used.
+@socketdir@/\fI<uid>\fR is used.
 .RE
 
 .TP
@@ -250,6 +250,18 @@ terminal server.
 The number of login attempts that are allowed on terminal server. If set
 to \fI0\fR, unlimited attempts are allowed. If not specified, defaults to
 \fI3\fR.
+
+.TP
+\fBXAuthorityInSystemDir\fR=\fI[no|yes]\fR
+If set to \fBno\fR (the default), \fBXAUTHORITY\fR will not be set for
+sessions, and the X11 authfile will be $HOME/.Xauthority.
+.br
+If set to \fByes\fR, xrdp will point \fBXAUTHORITY\fR to a file
+in a system directory private to the logged-in user (currently
+@socketdir@/\fI<uid>\fR/Xauthority).
+.br
+You may wish to use this if $HOME is NFS-mounted, or you are experiencing
+other applications overwriting the default file.
 
 .TP
 \fBTerminalServerUsers\fR=\fIgroup\fR

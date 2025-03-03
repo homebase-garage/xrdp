@@ -14,6 +14,7 @@ ReconnectScript=reconnectwm.sh
 [Security]
 AllowRootLogin=true
 MaxLoginRetry=4
+XAuthorityInSystemDir=no
 TerminalServerUsers=tsusers
 TerminalServerAdmins=tsadmins
 ; When AlwaysGroupCheck=false access will be permitted
