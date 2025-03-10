@@ -324,7 +324,8 @@ lib_mod_connect(struct mod *mod)
     }
     else
     {
-        mod->server_msg(mod, "connection problem, giving up", 0);
+        LOG(LOG_LEVEL_ERROR, "Error connecting to X server [%s]",
+            g_get_strerror());
     }
 
     if (error == 0)
