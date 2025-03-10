@@ -48,8 +48,13 @@ tcp_keepalive=true
 #tcp_send_buffer_bytes=32768
 #tcp_recv_buffer_bytes=32768
 
-; security layer can be 'tls', 'rdp' or 'negotiate'
-; for client compatible layer
+; security layer can be 'tls', 'rdp' or 'negotiate':-
+;
+; tls       - Insist on TLS for security (maximum security)
+; rdp       - Insist on RDP for security (testing only)
+; negotiate - Negotiate whatever can be supported by both client and
+;             server (maximum compatibility)
+;
 security_layer=negotiate
 
 ; minimum security level allowed for client for classic RDP encryption

@@ -371,6 +371,13 @@ save_all(const char *e_data, int e_len, const char *n_data, int n_len,
 
     if (fd != -1)
     {
+        if (e_data == NULL)
+        {
+            /* FIPS mode */
+            g_file_close(fd);
+            return 0;
+        }
+
         if (g_file_write(fd, "[keys]\n", 7) == -1)
         {
             g_writeln("problem writing to %s, maybe no rights", filename);
@@ -397,48 +404,49 @@ save_all(const char *e_data, int e_len, const char *n_data, int n_len,
 static int
 key_gen(const char *path_and_file_name)
 {
-    char *e_data;
-    char *n_data;
-    char *d_data;
-    char *sign_data;
-    int e_len;
-    int n_len;
-    int d_len;
-    int sign_len;
-    int error;
+    char *e_data = NULL;
+    char n_data[256] = {0};
+    char d_data[256] = {0};
+    char sign_data[64] = {0};
+    int e_len = 4;
+    int n_len = g_key_size_bits / 8;
+    int d_len = n_len;
+    int sign_len = sizeof(sign_data);
+    int error = 0;
 
-    e_data = (char *)g_exponent;
-    n_data = (char *)g_malloc(256, 0);
-    d_data = (char *)g_malloc(256, 0);
-    sign_data = (char *)g_malloc(64, 0);
-    e_len = 4;
-    n_len = g_key_size_bits / 8;
-    d_len = n_len;
-    sign_len = 64;
-    error = 0;
-    g_writeln("%s", "");
-    g_writeln("Generating %d bit rsa key...", g_key_size_bits);
-    g_writeln("%s", "");
-
-    if (error == 0)
+    if (g_fips_mode_enabled())
     {
-        error = ssl_gen_key_xrdp1(g_key_size_bits, e_data, e_len, n_data, n_len,
-                                  d_data, d_len);
-        if (error != 0)
-        {
-            g_writeln("error %d in key_gen, ssl_gen_key_xrdp1", error);
-        }
-    }
-
-    if (error == 0)
-    {
-        g_writeln("ssl_gen_key_xrdp1 ok");
         g_writeln("%s", "");
-        error = sign_key(e_data, e_len, n_data, n_len, sign_data, sign_len);
+        g_writeln("This machine is running in FIPS mode - keys will not be generated");
+        g_writeln("%s", "");
+    }
+    else
+    {
+        e_data = (char *)g_exponent;
+        g_writeln("%s", "");
+        g_writeln("Generating %d bit rsa key...", g_key_size_bits);
+        g_writeln("%s", "");
 
-        if (error != 0)
+        if (error == 0)
         {
-            g_writeln("error %d in key_gen, sign_key", error);
+            error = ssl_gen_key_xrdp1(g_key_size_bits, e_data, e_len, n_data, n_len,
+                                      d_data, d_len);
+            if (error != 0)
+            {
+                g_writeln("error %d in key_gen, ssl_gen_key_xrdp1", error);
+            }
+        }
+
+        if (error == 0)
+        {
+            g_writeln("ssl_gen_key_xrdp1 ok");
+            g_writeln("%s", "");
+            error = sign_key(e_data, e_len, n_data, n_len, sign_data, sign_len);
+
+            if (error != 0)
+            {
+                g_writeln("error %d in key_gen, sign_key", error);
+            }
         }
     }
 
@@ -453,9 +461,6 @@ key_gen(const char *path_and_file_name)
         }
     }
 
-    g_free(n_data);
-    g_free(d_data);
-    g_free(sign_data);
     return error;
 }
 

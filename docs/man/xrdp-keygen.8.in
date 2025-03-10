@@ -31,6 +31,10 @@ If \fBauto\fP is used as \fIoutfile\fP, the default file \fI@sysconfdir@/@syscon
 .B test
 Generate a test key pair and print information to standard output.
 
+.SH NOTES
+On machines with FIPS enabled, this program will generate an empty file,
+and a warning. On these machines, xrdp cannot use Classic RDP encryption.
+
 .SH FILES
 .TP
 .I @sysconfdir@/@sysconfsubdir@/rsakeys.ini
