@@ -168,8 +168,8 @@ access_login_allowed(const struct config_security *cfg_sec, const char *user)
 
 /******************************************************************************/
 int
-access_login_mng_allowed(const struct config_security *cfg_sec,
-                         const char *user)
+access_login_is_admin(const struct config_security *cfg_sec,
+                      const char *user)
 {
     int rv = 0;
 
