@@ -73,6 +73,9 @@ process_session_announce_event(struct session_item *si)
         si->display = display;
 
         si->state = E_SESSION_RUNNING;
+
+        LOG(LOG_LEVEL_INFO,
+            "sesman: Session on display :%d is now running", si->display);
     }
 
     return rv;
@@ -82,7 +85,7 @@ process_session_announce_event(struct session_item *si)
 static void
 process_session_finished_event(struct session_item *si)
 {
-    LOG(LOG_LEVEL_INFO, "Session on display %d has finished.",
+    LOG(LOG_LEVEL_INFO, "sesman: Session on display :%d has finished.",
         si->display);
     // Setting the transport down will remove this connection from the list
     si->sesexec_trans->status = TRANS_STATUS_DOWN;
