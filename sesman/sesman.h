@@ -32,20 +32,7 @@ struct trans;
 
 /* Globals */
 extern struct config_sesman *g_cfg;
-
-/**
- * Close all file descriptors used by sesman.
- *
- * This is generally used after forking, to make sure the
- * file descriptors used by the main process are not disturbed
- *
- * This call will also :-
- * - release all trans objects held by sesman
- * - Delete sesman wait objects
- * - Call sesman_delete_listening_transport()
- */
-int
-sesman_close_all(void);
+extern tintptr g_term_event;
 
 /*
  * Remove the listening transport

@@ -67,4 +67,24 @@ sesexec_is_term(void);
 void
 sesexec_terminate_main_loop(int status);
 
+/**
+ * Sets the ECP (sesman) transport
+ *
+ * @param t Transport supposedly connected to the ECP protocol
+ *          provider (sesman), or NULL to clear the transport
+ * @return 0 for success
+ *
+ * Peer credentials are checked for root:root
+ */
+int
+sesexec_set_ecp_transport(struct trans *t);
+
+/*
+ * Is the ECP transport still active?
+ *
+ * @result boolean
+ */
+int
+sesexec_is_ecp_active(void);
+
 #endif // SESEXEC_H

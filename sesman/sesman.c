@@ -46,6 +46,7 @@
 #include "scp.h"
 #include "scp_process.h"
 #include "sesexec_control.h"
+#include "sesman_restart.h"
 #include "sig.h"
 #include "string_calls.h"
 #include "trans.h"
@@ -78,7 +79,7 @@ struct sesman_startup_params
 };
 
 struct config_sesman *g_cfg;
-static tintptr g_term_event = 0;
+tintptr g_term_event = 0;
 static tintptr g_sigchld_event = 0;
 static tintptr g_reload_event = 0;
 
@@ -87,7 +88,6 @@ static struct trans *g_list_trans;
 /* Variables used to lock g_list_trans */
 static struct lock_uds *g_list_trans_lock;
 
-static struct list *g_con_list = NULL;
 static int g_pid;
 
 /*****************************************************************************/
@@ -202,7 +202,18 @@ static int sesman_listen_test(struct config_sesman *cfg)
 }
 
 /******************************************************************************/
-int
+/**
+ * Close all file descriptors used by sesman.
+ *
+ * This is generally used after forking, to make sure the
+ * file descriptors used by the main process are not disturbed
+ *
+ * This call will also :-
+ * - release all trans objects held by sesman
+ * - Delete sesman wait objects
+ * - Call sesman_delete_listening_transport()
+ */
+static int
 sesman_close_all(void)
 {
     LOG_DEVEL(LOG_LEVEL_TRACE, "sesman_close_all:");
@@ -459,17 +470,10 @@ sesman_main_loop(void)
     int robjs_count;
     intptr_t robjs[1024];
 
-    g_con_list = list_create();
-    if (g_con_list == NULL)
-    {
-        LOG(LOG_LEVEL_ERROR, "sesman_main_loop: list_create failed");
-        return 1;
-    }
     if (sesman_create_listening_transport(g_cfg) != 0)
     {
         LOG(LOG_LEVEL_ERROR,
             "sesman_main_loop: sesman_create_listening_transport failed");
-        list_delete(g_con_list);
         return 1;
     }
     LOG(LOG_LEVEL_INFO, "Sesman now listening on %s", g_cfg->listen_port);
@@ -942,7 +946,8 @@ main(int argc, char **argv)
     }
 
     if ((error = pre_session_list_init(MAX_PRE_SESSION_ITEMS)) == 0 &&
-            (error = session_list_init()) == 0)
+            (error = session_list_init()) == 0 &&
+            (error = sesman_restart_discover_sessions()) == 0)
     {
         error = sesman_main_loop();
     }

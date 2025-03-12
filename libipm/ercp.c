@@ -81,6 +81,32 @@ ercp_trans_from_eicp_trans(struct trans *trans,
 
 /*****************************************************************************/
 
+struct trans *
+ercp_connect(const  char *port, int (*term_func)(void))
+{
+    struct trans *t;
+
+    if ((t = trans_create(TRANS_MODE_UNIX, 128, 128)) != NULL)
+    {
+        t->is_term = term_func;
+
+        if (trans_connect(t, NULL, port, 3000) != 0)
+        {
+            trans_delete(t);
+            t = NULL;
+        }
+        else if (ercp_init_trans(t) != 0)
+        {
+            trans_delete(t);
+            t = NULL;
+        }
+    }
+
+    return t;
+}
+
+/*****************************************************************************/
+
 int
 ercp_msg_in_check_available(struct trans *trans, int *available)
 {
@@ -182,10 +208,7 @@ ercp_get_session_announce_event(struct trans *trans,
 
     if (rv == 0)
     {
-        if (display != NULL)
-        {
-            *display = i_display;
-        }
+        *display = i_display;
         *uid = (uid_t)i_uid;
         *type = (enum scp_session_type)i_type;
         *start_width = i_width;

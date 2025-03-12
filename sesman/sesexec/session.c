@@ -974,11 +974,21 @@ session_get_start_time(const struct session_data *sd)
 }
 
 /******************************************************************************/
+const struct session_parameters *
+session_get_parameters(const struct session_data *sd)
+{
+    return (sd == NULL) ? NULL : &sd->params;
+}
+
+/******************************************************************************/
 void
 session_send_term(struct session_data *sd)
 {
     if (sd != NULL && sd->win_mgr > 0)
     {
+        // Killing the window manager only is appropriate here.
+        // When we process SIGCHLD for the windowe manager, we
+        // will kill other processes as appropriate
         g_sigterm(sd->win_mgr);
     }
 }

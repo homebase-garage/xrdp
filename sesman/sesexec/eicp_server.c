@@ -37,6 +37,7 @@
 #include "ercp.h"
 #include "scp.h"
 #include "sesexec.h"
+#include "sesexec_discover.h"
 #include "session.h"
 
 /******************************************************************************/
@@ -98,12 +99,13 @@ handle_create_session_request(struct trans *self)
 {
     int scp_fd;
     struct session_parameters sp = {0};
-    int rv;
+    int status;
 
-    rv = eicp_get_create_session_request(self, &scp_fd, &sp.display,
-                                         &sp.type, &sp.width, &sp.height,
-                                         &sp.bpp, &sp.shell, &sp.directory);
-    if (rv == 0)
+    status = eicp_get_create_session_request(
+                 self, &scp_fd, &sp.display,
+                 &sp.type, &sp.width, &sp.height,
+                 &sp.bpp, &sp.shell, &sp.directory);
+    if (status == 0)
     {
         // Need to talk to the SCP client
         struct trans *scp_trans;
@@ -113,7 +115,7 @@ handle_create_session_request(struct trans *self)
         {
             LOG(LOG_LEVEL_ERROR, "Can't create SCP trans");
             g_file_close(scp_fd);
-            rv = 1;
+            status = 1;
         }
         else
         {
@@ -134,39 +136,68 @@ handle_create_session_request(struct trans *self)
                 scp_status = session_start(g_login_info, &sp, &g_session_data);
             }
 
-            // Return the status to the SCP client
-            rv = scp_send_create_session_response(scp_trans, scp_status,
-                                                  sp.display, &sp.guid);
-            trans_delete(scp_trans);
-
-            // Further comms from sesexec is sent over the ERCP protocol
+            // Further comms to sesman is sent over the ERCP protocol
             ercp_trans_from_eicp_trans(self,
                                        sesexec_ercp_data_in,
                                        (void *)self);
 
-            if (scp_status == E_SCP_SCREATE_OK)
+            if (scp_status != E_SCP_SCREATE_OK)
             {
-                rv = ercp_send_session_announce_event(
-                         self,
-                         sp.display,
-                         g_login_info->uid,
-                         sp.type,
-                         sp.width,
-                         sp.height,
-                         sp.bpp,
-                         &sp.guid,
-                         g_login_info->ip_addr,
-                         session_get_start_time(g_session_data));
+                // Tell sesman the session hasn't started
+                (void)ercp_send_session_finished_event(self);
             }
-            else
+            else if ((status = ercp_send_session_announce_event(
+                                   self,
+                                   sp.display,
+                                   g_login_info->uid,
+                                   sp.type,
+                                   sp.width,
+                                   sp.height,
+                                   sp.bpp,
+                                   &sp.guid,
+                                   g_login_info->ip_addr,
+                                   session_get_start_time(g_session_data))) != 0)
             {
-                rv = ercp_send_session_finished_event(self);
-                sesexec_terminate_main_loop(1);
+                // We failed to tell sesman about the new session. This
+                // probably means sesman has exited in the time between
+                // asking us to start a session, and our reply. This
+                // could be many seconds, and a new sesman may well
+                // have started.
+                // If we enable the restart functionality at
+                // this point, we have a race condition that could
+                // result in a session which sesman doesn't know
+                // about. The simplest thing to do in this rare situation
+                // is to abort the session - the user can create a
+                // new one
+                LOG(LOG_LEVEL_ERROR,
+                    "sesman appears to have failed - stopping session");
+                scp_status = E_SCP_SCREATE_GENERAL_ERROR;
             }
-        }
+            else if ((status = sesexec_discover_enable()) != 0)
+            {
+                // Equally regrettable - we can't make the session
+                // discoverable, so we'll stop it. We can tell sesman
+                // about this one however.
+                LOG(LOG_LEVEL_ERROR,
+                    "unable to make session discoverable"
+                    " - stopping session");
+                (void)ercp_send_session_finished_event(self);
+                scp_status = E_SCP_SCREATE_GENERAL_ERROR;
+            }
 
+            // Return the status to the SCP client.
+            (void)scp_send_create_session_response(scp_trans, scp_status,
+                                                   sp.display, &sp.guid);
+            trans_delete(scp_trans);
+        }
     }
-    return rv;
+
+    if (status != 0)
+    {
+        // Kill sesexec, and any active session
+        sesexec_terminate_main_loop(status);
+    }
+    return 0;
 }
 
 /******************************************************************************/

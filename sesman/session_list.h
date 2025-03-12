@@ -91,6 +91,14 @@ unsigned int
 session_list_get_count(void);
 
 /**
+ * @brief Get the number of sessions in a particular state
+ * @param state to count
+ * @return session count
+ */
+unsigned int
+session_list_get_count_by_state(enum session_state state);
+
+/**
  * Allocates a new session on the list
  *
  * state will be E_SESSION_STARTING. Other data must be filled in by

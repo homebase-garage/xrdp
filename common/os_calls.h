@@ -270,6 +270,7 @@ int      g_file_exist(const char *filename);
 int      g_file_readable(const char *filename);
 int      g_directory_exist(const char *dirname);
 int      g_executable_exist(const char *dirname);
+int      g_socket_exist(const char *dirname);
 int      g_create_dir(const char *dirname);
 int      g_create_path(const char *path);
 int      g_remove_dir(const char *dirname);
@@ -447,6 +448,19 @@ int      g_fips_mode_enabled(void);
 void
 g_qsort(void *base, size_t nitems, size_t size,
         int (*compar)(const void *, const void *));
+
+/**
+ * Returns a list of the filenames contained within a directory
+ *
+ * @param dir Name of directory
+ * @return list of directory entry names
+ *
+ * If NULL is returned, further information may be available in errno. No
+ * other errors are specifically logged.
+ * The special files '.' and '..' are not returned.
+ */
+struct list *
+g_readdir(const char *dir);
 
 /** Set the out-of-memory handler
  * @param new_handler Function to call if a memory allocation fails

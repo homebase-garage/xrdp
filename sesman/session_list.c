@@ -123,6 +123,24 @@ session_list_get_count(void)
 }
 
 /******************************************************************************/
+unsigned int
+session_list_get_count_by_state(enum session_state state)
+{
+    unsigned int result = 0;
+    int i;
+    for (i = 0 ; i < g_session_list->count ; ++i)
+    {
+        struct session_item *si;
+        si = (struct session_item *)list_get_item(g_session_list, i);
+        if (si->state == state)
+        {
+            ++result;
+        }
+    }
+    return result;
+}
+
+/******************************************************************************/
 struct session_item *
 session_list_new(void)
 {

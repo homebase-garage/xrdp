@@ -37,6 +37,7 @@
 #define ctid_t id_t
 #endif
 #include <unistd.h>
+#include <dirent.h>
 #include <errno.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -2678,6 +2679,23 @@ g_executable_exist(const char *exename)
 }
 
 /*****************************************************************************/
+/* returns boolean, non zero if the socket exists */
+int
+g_socket_exist(const char *sockname)
+{
+    struct stat st;
+
+    if (stat(sockname, &st) == 0)
+    {
+        return S_ISSOCK(st.st_mode);
+    }
+    else
+    {
+        return 0;
+    }
+}
+
+/*****************************************************************************/
 /* returns boolean */
 int
 g_create_dir(const char *dirname)
@@ -4275,6 +4293,64 @@ g_qsort(void *base, size_t nitems, size_t size,
         int (*compar)(const void *, const void *))
 {
     qsort(base, nitems, size, compar);
+}
+
+/*****************************************************************************/
+struct list *
+g_readdir(const char *dir)
+{
+    DIR *handle;
+    struct list *result = NULL;
+    struct dirent *dent;
+    int saved_errno;
+
+    errno = 0; // See readdir(3)
+    if ((handle = opendir(dir)) != NULL &&
+            (result = list_create()) != NULL)
+    {
+        result->auto_free = 1;
+        while (1)
+        {
+            errno = 0;
+            dent = readdir(handle);
+            if (dent == NULL)
+            {
+                break; // errno = 0 for end-of-dir, or != 0 for error
+            }
+
+            // Ignore '.' and '..'
+            if (dent->d_name[0] == '.' && dent->d_name[1] == '\0')
+            {
+                continue;
+            }
+            if (dent->d_name[0] == '.' && dent->d_name[1] == '.' &&
+                    dent->d_name[2] == '\0')
+            {
+                continue;
+            }
+
+            if (!list_add_strdup(result, dent->d_name))
+            {
+                // Memory allocation failure
+                errno = ENOMEM;
+                break;
+            }
+        }
+    }
+
+    saved_errno = errno;
+    if (errno != 0)
+    {
+        list_delete(result);
+        result = NULL;
+    }
+    if (handle != NULL)
+    {
+        closedir(handle);
+    }
+    errno = saved_errno;
+
+    return result;
 }
 
 /******************************************************************************/
