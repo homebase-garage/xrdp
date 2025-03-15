@@ -39,147 +39,133 @@
 
 /******************************************************************************/
 /**
- * Root user login check
+ * user is root
  *
- * @param cfg_sec Sesman security config
- * @param user user name
- * @return 0 if user is root and root accesses are not allowed
+ * @param username
+ * @return 1 if user is UID 0
  */
 static int
-root_login_check(const struct config_security *cfg_sec,
-                 const char *user)
+user_is_root(const char *user)
 {
-    int rv = 0;
-    if (cfg_sec->allow_root)
-    {
-        rv = 1;
-    }
-    else
-    {
-        // Check the UID of the user isn't 0
-        int uid;
-        if (g_getuser_info_by_name(user, &uid, NULL, NULL, NULL, NULL) != 0)
-        {
-            LOG(LOG_LEVEL_ERROR, "Can't get UID for user %s", user);
-        }
-        else if (0 == uid)
-        {
-            LOG(LOG_LEVEL_ERROR,
-                "ROOT login attempted, but root login is disabled");
-        }
-        else
-        {
-            rv = 1;
-        }
-    }
-    return rv;
-}
-
-/******************************************************************************/
-/**
- * Common access control for group checks
- * @param group Group name
- * @param param Where group comes from (e.g. "TerminalServerUsers")
- * @param always_check_group 0 if a missing group allows a login
- * @param user Username
- * @return != 0 if the access is allowed */
-
-static int
-access_login_allowed_common(const char *group, const char *param,
-                            int always_check_group,
-                            const char *user)
-{
-    int rv = 0;
-    int gid;
-    int ok;
-
-    if (group == NULL || group[0] == '\0')
-    {
-        /* Group is not defined. Default access depends on whether
-         * we must have the group or not */
-        if (always_check_group)
-        {
-            LOG(LOG_LEVEL_ERROR,
-                "%s group is not defined. Access denied for %s",
-                param, user);
-        }
-        else
-        {
-            LOG(LOG_LEVEL_INFO,
-                "%s group is not defined. Access granted for %s",
-                param, user);
-            rv = 1;
-        }
-    }
-    else if (g_getgroup_info(group, &gid) != 0)
-    {
-        /* Group is defined but doesn't exist. Default access depends
-         * on whether we must have the group or not */
-        if (always_check_group)
-        {
-            LOG(LOG_LEVEL_ERROR,
-                "%s group %s doesn't exist. Access denied for %s",
-                param, group, user);
-        }
-        else
-        {
-            LOG(LOG_LEVEL_INFO,
-                "%s group %s doesn't exist. Access granted for %s",
-                param, group, user);
-            rv = 1;
-        }
-    }
-    else if (0 != g_check_user_in_group(user, gid, &ok))
-    {
-        LOG(LOG_LEVEL_ERROR, "Error checking %s group %s. "
-            "Access denied for %s", param, group, user);
-    }
-    else if (!ok)
-    {
-        LOG(LOG_LEVEL_ERROR, "User %s is not in %s group %s. Access denied",
-            user, param, group);
-    }
-    else
-    {
-        LOG(LOG_LEVEL_INFO, "User %s is in %s group %s. Access granted",
-            user, param, group);
-        rv = 1;
-    }
-
-    return rv;
+    int uid = -1;
+    (void)g_getuser_info_by_name(user, &uid, NULL, NULL, NULL, NULL);
+    return (uid == 0);
 }
 
 /******************************************************************************/
 int
 access_login_allowed(const struct config_security *cfg_sec, const char *user)
 {
-    int rv = 0;
+    int ok = 0;
 
-    if (root_login_check(cfg_sec, user))
+    if (!cfg_sec->allow_root && user_is_root(user))
     {
-        rv = access_login_allowed_common(cfg_sec->ts_users,
-                                         "TerminalServerUsers",
-                                         cfg_sec->ts_always_group_check,
-                                         user);
+        LOG(LOG_LEVEL_ERROR,
+            "ROOT login attempted, but root login is disabled");
+    }
+    else
+    {
+        const char *group = cfg_sec->ts_users;
+        const char *param = "TerminalServerUsers";
+        int gid = -1;
+
+        if (group == NULL || group[0] == '\0')
+        {
+            /* Group is not defined. Default access depends on whether
+             * we must have the group or not */
+            if (cfg_sec->ts_always_group_check)
+            {
+                LOG(LOG_LEVEL_ERROR,
+                    "%s group is not defined. Access denied for %s",
+                    param, user);
+            }
+            else
+            {
+                LOG(LOG_LEVEL_INFO,
+                    "%s group is not defined. Access granted for %s",
+                    param, user);
+                ok = 1;
+            }
+        }
+        else if (g_getgroup_info(group, &gid) != 0)
+        {
+            /* Group is defined but doesn't exist. Default access depends
+             * on whether we must have the group or not */
+            if (cfg_sec->ts_always_group_check)
+            {
+                LOG(LOG_LEVEL_ERROR,
+                    "%s group %s doesn't exist. Access denied for %s",
+                    param, group, user);
+            }
+            else
+            {
+                LOG(LOG_LEVEL_INFO,
+                    "%s group %s doesn't exist. Access granted for %s",
+                    param, group, user);
+                ok = 1;
+            }
+        }
+        else if (0 != g_check_user_in_group(user, gid, &ok))
+        {
+            LOG(LOG_LEVEL_ERROR, "Error checking %s group %s. "
+                "Access denied for %s", param, group, user);
+        }
+        else if (!ok)
+        {
+            LOG(LOG_LEVEL_ERROR, "User %s is not in %s group %s. Access denied",
+                user, param, group);
+        }
+        else
+        {
+            LOG(LOG_LEVEL_INFO, "User %s is in %s group %s. Access granted",
+                user, param, group);
+        }
     }
 
-    return rv;
+    return ok;
 }
 
 /******************************************************************************/
 int
-access_login_mng_allowed(const struct config_security *cfg_sec,
-                         const char *user)
+access_login_is_admin(const struct config_security *cfg_sec,
+                      const char *user)
 {
-    int rv = 0;
+    int ok = 0;
 
-    if (root_login_check(cfg_sec, user))
+    const char *group = cfg_sec->ts_admins;
+    const char *param = "TerminalServerAdmins";
+    int gid = -1;
+
+    if (group == NULL || group[0] == '\0')
     {
-        rv = access_login_allowed_common(cfg_sec->ts_admins,
-                                         "TerminalServerAdmins",
-                                         1,
-                                         user);
+        if (cfg_sec->ts_always_group_check)
+        {
+            LOG(LOG_LEVEL_ERROR, "%s group is not defined", param);
+        }
+    }
+    else if (g_getgroup_info(group, &gid) != 0)
+    {
+        /* Group is defined but doesn't exist */
+        if (cfg_sec->ts_always_group_check)
+        {
+            LOG(LOG_LEVEL_ERROR, "%s group %s doesn't exist.", param, group);
+        }
+    }
+    else if (0 != g_check_user_in_group(user, gid, &ok))
+    {
+        LOG(LOG_LEVEL_ERROR, "Error checking %s group %s.", param, group);
     }
 
-    return rv;
+    // Root always has access. Do other checks and logging first
+    if (!ok && user_is_root(user))
+    {
+        ok = 1;
+    }
+
+    if (ok)
+    {
+        LOG(LOG_LEVEL_INFO, "User %s is in %s group %s", user, param, group);
+    }
+
+    return ok;
 }

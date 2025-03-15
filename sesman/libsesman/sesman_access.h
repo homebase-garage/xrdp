@@ -42,13 +42,13 @@ access_login_allowed(const struct config_security *cfg_sec,
 
 /**
  *
- * @brief Checks if the user is allowed to access the terminal server for management
+ * @brief Checks if the user is allowed to admin the terminal server
  * @param user the user to check
- * @return 0 if access is denied, !=0 if allowed
+ * @return != 0 if the user can perform administrative tasks
  *
  */
 int
-access_login_mng_allowed(const struct config_security *cfg_sec,
-                         const char *user);
+access_login_is_admin(const struct config_security *cfg_sec,
+                      const char *user);
 
 #endif

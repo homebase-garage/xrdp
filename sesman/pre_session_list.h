@@ -77,6 +77,7 @@ struct pre_session_item
     uid_t uid; ///< User
     char *username; ///< Username from UID (at time of logon)
     char start_ip_addr[MAX_PEER_ADDRSTRLEN];
+    int is_admin;
 };
 
 

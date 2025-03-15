@@ -438,7 +438,7 @@ session_list_get_bydata(uid_t uid,
 
 /******************************************************************************/
 struct scp_session_info *
-session_list_get_byuid(uid_t uid, unsigned int *cnt, unsigned int flags)
+session_list_get_byuid(const uid_t *uid, unsigned int *cnt, unsigned int flags)
 {
     int i;
     struct scp_session_info *sess;
@@ -447,13 +447,20 @@ session_list_get_byuid(uid_t uid, unsigned int *cnt, unsigned int flags)
 
     count = 0;
 
-    LOG(LOG_LEVEL_DEBUG, "searching for session by UID: %d", uid);
+    if (uid != NULL)
+    {
+        LOG(LOG_LEVEL_DEBUG, "searching for session by UID: %d", (int)*uid);
+    }
+    else
+    {
+        LOG(LOG_LEVEL_DEBUG, "searching for all sessions");
+    }
 
     for (i = 0 ; i < g_session_list->count ; ++i)
     {
         const struct session_item *si;
         si = (const struct session_item *)list_get_item(g_session_list, i);
-        if (SESSION_IN_USE(si) && uid == si->uid)
+        if (SESSION_IN_USE(si) && (uid == NULL || *uid == si->uid))
         {
             count++;
         }
@@ -480,7 +487,7 @@ session_list_get_byuid(uid_t uid, unsigned int *cnt, unsigned int flags)
         const struct session_item *si;
         si = (const struct session_item *)list_get_item(g_session_list, i);
 
-        if (SESSION_IN_USE(si) && uid == si->uid)
+        if (SESSION_IN_USE(si) && (uid == NULL || *uid == si->uid))
         {
             (sess[index]).sid = si->sesexec_pid;
             (sess[index]).display = si->display;
