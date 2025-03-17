@@ -58,6 +58,28 @@ typedef uint32_t encoding_type;
 #define RFB_ENC_DESKTOP_SIZE          (encoding_type)-223
 #define RFB_ENC_EXTENDED_DESKTOP_SIZE (encoding_type)-308
 
+/* Security types defined in RFC6143 7.2 (RFB Community wiki 7.1.2) */
+enum sec_type
+{
+    SEC_TYPE_INVALID = 0,
+    SEC_TYPE_NONE = 1,
+    SEC_TYPE_VNC_AUTH = 2,
+    SEC_TYPE_MAX = SEC_TYPE_VNC_AUTH // Max supported security type
+};
+
+#define SEC_TYPE_TO_STR(st) \
+    (((st) == SEC_TYPE_INVALID) ? "Invalid" : \
+     ((st) == SEC_TYPE_NONE) ? "None" : \
+     ((st) == SEC_TYPE_VNC_AUTH) ? "VNC Auth" : "Unknown")
+
+/* Constructs an RFB version from a major and minor version */
+#define MAKE_RFBPROTO_VER(maj,min) ((maj * 1000) + (min))
+
+/* Convenience macros */
+#define RFBPROTO_VER_3_3 MAKE_RFBPROTO_VER(3,3)
+#define RFBPROTO_VER_3_7 MAKE_RFBPROTO_VER(3,7)
+#define RFBPROTO_VER_3_8 MAKE_RFBPROTO_VER(3,8)
+
 /**
  * Returns an error string for an ExtendedDesktopSize status code
  */

@@ -30,6 +30,8 @@
 #include <config_ac.h>
 #endif
 
+#include <ctype.h>
+#include <limits.h>
 #include <X11/keysym.h>
 
 #include "vnc.h"
@@ -1644,6 +1646,593 @@ lib_data_in(struct trans *trans)
 }
 
 /******************************************************************************/
+/**
+ * Gets a reason string from the server
+ *
+ * Sometimes the server sends an error, which is a 32-bit word
+ * followed by a string
+ */
+static int
+get_reason_string(struct vnc *v, char buff[], unsigned int bufflen)
+{
+    int rv = 1;
+    struct stream *s;
+    make_stream(s);
+    init_stream(s, (int)(bufflen + 4));
+
+    if (trans_force_read_s(v->trans, s, 4) == 0)
+    {
+        unsigned int len;
+        in_uint32_be(s, len);
+        if (len < bufflen)
+        {
+            if (trans_force_read_s(v->trans, s, len) == 0)
+            {
+                in_uint8a(s, buff, len);
+                buff[len] = '\0';
+                rv = 0;
+            }
+        }
+    }
+
+    free_stream(s);
+    return rv;
+}
+
+/******************************************************************************/
+/**
+ * Negotiates the protocol version with the server
+ *
+ * @param v Module
+ * @param[out] next_char Either security-type (version 3.3) or
+ *                       number-of-security-types (versions > 3.3)
+ * @return 0 for error, or protocol version > 0
+ *
+ * The protocol negotiation is overlapped with the security negotiation.
+ * The result of the protocol negotiation is either good, in which case
+ * 'next_char' contains a protocol-dependent value, or not-good, in which
+ * case 'next_char' was set to zero and followed by a reason string. The
+ * reason string is consumed here, and logged.
+ *
+ * See sections 7.1.1 and 7.1.2 of the RFB community wiki
+ */
+static unsigned int
+negotiate_protocol_version(struct vnc *v, unsigned char *next_char)
+{
+    struct stream *s =  NULL;
+    unsigned int major;
+    unsigned int minor;
+    unsigned int version;
+    int sec_type_size;
+
+    make_stream(s);
+    init_stream(s, 64);
+    if (trans_force_read_s(v->trans, s, 12) != 0)
+    {
+        LOG(LOG_LEVEL_ERROR, "Error reading server version string");
+        goto fail;
+    }
+
+    const char *p;
+    in_uint8p(s, p, 12); /* Moves s->p to end of string */
+    /* Expecting a string "RFB ???.???\n" where ? is a digit */
+    if (*p++ != 'R' || *p++ != 'F' || *p++ != 'B' ||
+            *p++ != ' ' ||
+            !isdigit(*p++) || !isdigit(*p++) || !isdigit(*p++) ||
+            *p++ != '.' ||
+            !isdigit(*p++) || !isdigit(*p++) || !isdigit(*p++) ||
+            *p++ != '\n')
+    {
+        LOG_HEXDUMP(LOG_LEVEL_ERROR, "Invalid RFB string :", s->data, 12);
+        goto fail;
+    }
+
+    /* Parse the major/minor versions in-place */
+    p = s->data;
+    major = (p[4] - '0') * 100 + (p[5] - '0') * 10 + (p[6] - '0');
+    minor = (p[8] - '0') * 100 + (p[9] - '0') * 10 + (p[10] - '0');
+    version = MAKE_RFBPROTO_VER(major, minor);
+
+    if (version == RFBPROTO_VER_3_3 ||
+            version == RFBPROTO_VER_3_7 ||
+            version == RFBPROTO_VER_3_8)
+    {
+        /* Versions documented in RFC6143 */
+        LOG(LOG_LEVEL_INFO,
+            "RFB version %d.%d is supported by VNC server",
+            major, minor);
+    }
+    else if (major == 3)
+    {
+        /* RFC6143 section 6 states that unknown 3.x versions should
+         * be treated as 3.3 */
+        LOG(LOG_LEVEL_INFO, "RFB server reports version %d.%d.",
+            major, minor);
+
+        minor = 3;
+        version = MAKE_RFBPROTO_VER(major, minor);
+        LOG(LOG_LEVEL_INFO, "Proposing RFB version %d.%d to server",
+            major, minor);
+    }
+    else if (major > 3)
+    {
+        /* This must be a new server version. Try to fall back to 3.8 */
+        LOG(LOG_LEVEL_INFO, "RFB server reports version %d.%d.",
+            major, minor);
+
+        major = 3;
+        minor = 8;
+        version = MAKE_RFBPROTO_VER(major, minor);
+        LOG(LOG_LEVEL_INFO, "Proposing RFB version %d.%d to server",
+            major, minor);
+    }
+    else
+    {
+        LOG(LOG_LEVEL_ERROR,
+            "Server reports unsupported RFB version %d.%d",
+            major, minor);
+        goto fail;
+    }
+
+    /* Send our proposed version back to the server */
+    /* s->p should be in the right place to mark the end
+     * of the string */
+    g_snprintf(s->data, s->size, "RFB %03d.%03d\n", major, minor);
+    s_mark_end(s);
+
+    if (trans_force_write_s(v->trans, s) != 0)
+    {
+        LOG(LOG_LEVEL_ERROR, "Error writing server version string");
+        goto fail;
+    }
+
+    // Version 3.3 sends back a U32 rather than a U8 for the security
+    // type, even though the values it supports fit easily in a U8
+    sec_type_size = (version == RFBPROTO_VER_3_3) ? 4 : 1;
+    init_stream(s, 64);
+    if (trans_force_read_s(v->trans, s, sec_type_size) != 0)
+    {
+        LOG(LOG_LEVEL_ERROR,
+            "Can't read negotiation result from server");
+        goto fail;
+    }
+
+    // Read the next field, being careful to parse a whole U32 for
+    // version 3.3.
+    if (version == RFBPROTO_VER_3_3)
+    {
+        in_uint8s(s, 3); // Skip the three high octets
+    }
+    in_uint8(s, *next_char);
+
+    if (*next_char == 0)
+    {
+        char text[256];
+        // Server reported a reason for failure
+        if (get_reason_string(v, text, sizeof(text)) != 0)
+        {
+            g_snprintf(text, sizeof(text), "No reason given");
+        }
+        LOG(LOG_LEVEL_ERROR,
+            "Version negotiation with server failed [%s]", text);
+        goto fail;
+    }
+
+    free_stream(s);
+    return version;
+
+fail:
+    free_stream(s);
+    return 0;
+}
+
+/******************************************************************************/
+/**
+ * Chooses the security type from a list sent by the server
+ *
+ * @param v Module
+ * @param max_security_type Max security type to negotiate
+ * @return 0 for error, or security type ( > 0)
+ *
+ * See section 7.1.2 of the RFB community wiki
+ *
+ * This call is only made for RFB version 3.7 onwards
+ */
+static enum sec_type
+choose_security_type(struct vnc *v, unsigned char number_of_security_types,
+                     enum sec_type max_security_type)
+{
+    enum sec_type sec_type = SEC_TYPE_INVALID;
+
+    struct stream *s =  NULL;
+    make_stream(s);
+    init_stream(s, UCHAR_MAX);
+
+    if (trans_force_read_s(v->trans, s, number_of_security_types) != 0)
+    {
+        LOG(LOG_LEVEL_ERROR, "Can't read list of security types from server");
+    }
+    else
+    {
+        while (s_rem(s) > 0)
+        {
+            int j;
+            in_uint8(s, j);
+            enum sec_type st = (enum sec_type)j;
+            // Choose the highest security level that we support
+            if (st > max_security_type)
+            {
+                // If in development, log unsupported security types
+                LOG_DEVEL(LOG_LEVEL_INFO,
+                          "Unsupported VNC security type %d was offered", j);
+                continue;
+            }
+
+            if (st > sec_type)
+            {
+                sec_type = st;
+            }
+        }
+        if (sec_type == SEC_TYPE_INVALID)
+        {
+            LOG(LOG_LEVEL_ERROR,
+                "RFB server did not offer a compatible security type");
+        }
+        else
+        {
+            init_stream(s, 1);
+            out_uint8(s, sec_type);
+            s_mark_end(s);
+            if (trans_force_write_s(v->trans, s) != 0)
+            {
+                LOG(LOG_LEVEL_ERROR, "Can't send security type to server");
+                sec_type = SEC_TYPE_INVALID;
+            }
+        }
+    }
+
+    free_stream(s);
+    return sec_type;
+}
+
+/******************************************************************************/
+/**
+ * Negotiates the security type with the server
+ *
+ * @param v Module
+ * @param rfbproto_version RFB version negotiated with the server
+ * @param next_char The character sent back (>0) when the protocol
+ *                  version was agreed.
+ * @return the negotiated security type (or SEC_TYPE_INVALID)
+ */
+static enum sec_type
+negotiate_security_type(struct vnc *v, unsigned int rfbproto_version,
+                        unsigned char next_char)
+{
+    char text[256];
+    enum sec_type sec_type;
+    // Whether the SecurityResult word is read from the server
+    // (RFB Community wiki section 7.1.3)
+    int check_sec_result = 1;
+
+    struct stream *s =  NULL;
+    make_stream(s);
+    init_stream(s, 64);
+
+    if (rfbproto_version == RFBPROTO_VER_3_3)
+    {
+        // The server has already chosen the security type
+        sec_type = (enum sec_type)next_char;
+    }
+    else
+    {
+        // The client chooses the security type based on what's offered
+        sec_type = choose_security_type(v, next_char, SEC_TYPE_MAX);
+    }
+
+    if (sec_type == SEC_TYPE_INVALID)
+    {
+        goto fail; // An error has already been logged
+    }
+
+    g_sprintf(text, "VNC security type is %s", SEC_TYPE_TO_STR(sec_type));
+    v->server_msg(v, text, 0);
+
+    switch (sec_type)
+    {
+        case SEC_TYPE_NONE:
+            if (rfbproto_version < RFBPROTO_VER_3_8)
+            {
+                check_sec_result = 0;
+            }
+            break;
+
+        case SEC_TYPE_VNC_AUTH:
+        {
+            init_stream(s, 64);
+            if (trans_force_read_s(v->trans, s, 16) != 0)
+            {
+                LOG(LOG_LEVEL_ERROR,
+                    "Can't read VNC auth challenge from server");
+                goto fail;
+            }
+            if (guid_is_set(&v->guid))
+            {
+                char guid_str[GUID_STR_SIZE];
+                guid_to_str(&v->guid, guid_str);
+                rfbHashEncryptBytes(s->data, guid_str);
+            }
+            else
+            {
+                rfbEncryptBytes(s->data, v->password);
+            }
+            s->p += 16;
+            s_mark_end(s);
+            if (trans_force_write_s(v->trans, s) != 0)
+            {
+                LOG(LOG_LEVEL_ERROR, "Can't send VNC auth response to server");
+                goto fail;
+            }
+            break;
+        }
+        default:
+            // Shouldn't get here
+            LOG(LOG_LEVEL_ERROR, "VNC unsupported security type %d", sec_type);
+            goto fail;
+    }
+
+    if (check_sec_result)
+    {
+        /* RFB Community wiki 7.1.3 */
+        init_stream(s, 4);
+        if (trans_force_read_s(v->trans, s, 4) != 0)
+        {
+            LOG(LOG_LEVEL_ERROR, "Can't read SecurityResult from server");
+            goto fail;
+        }
+
+        int i;
+        in_uint32_be(s, i);
+
+        if (i != 0)
+        {
+            char msg[256];
+            // Versions >= 3.8 of the protocol send a reason string at
+            // this point
+            if (rfbproto_version < RFBPROTO_VER_3_8 ||
+                    get_reason_string(v, text, sizeof(text)) != 0)
+            {
+                g_snprintf(text, sizeof(text), "No reason given");
+            }
+            g_snprintf(msg, sizeof(msg),
+                       "VNC security negotiation failed [%s]", text);
+            v->server_msg(v, msg, 0);
+            goto fail;
+        }
+    }
+
+    free_stream(s);
+    return sec_type;
+
+fail:
+    free_stream(s);
+    return SEC_TYPE_INVALID;
+}
+
+/******************************************************************************/
+/**
+ * Sends the client init to the server (RFC6143 7.3.1)
+ *
+ * @param v Module
+ * @param share_flag Share flag value to send to the server
+ * @return 0 for success
+ */
+static int
+send_client_init(struct vnc *v, int share_flag)
+{
+    int rv;
+    struct stream *s;
+    make_stream(s);
+    init_stream(s, 64);
+    out_uint8(s, (share_flag) ? 1 : 0);
+    s_mark_end(s);
+    rv = trans_force_write_s(v->trans, s);
+    free_stream(s);
+    return rv;
+}
+
+/******************************************************************************/
+/**
+ * Receives the server init from the server (RFC6143 7.3.2)
+ *
+ * @param v Module
+ * @return 0 for success
+ */
+static int
+receive_server_init(struct vnc *v)
+{
+    int rv;
+    struct stream *s;
+    int width;
+    int height;
+    int name_len;
+    make_stream(s);
+    init_stream(s, 256);
+    rv = trans_force_read_s(v->trans, s, 2 + 2 + 16 + 4);
+    if (rv == 0)
+    {
+        in_uint16_be(s, width);
+        in_uint16_be(s, height);
+        in_uint8s(s, 16); // skip server pixel format
+        in_uint32_be(s, name_len);
+        init_stream(s, 256); // Reset stream to read name
+
+        if (name_len > 255 || name_len < 0)
+        {
+            LOG(LOG_LEVEL_ERROR, "Unexpected name length %d received",
+                name_len);
+            rv = 1;
+        }
+        else if (trans_force_read_s(v->trans, s, name_len) != 0)
+        {
+            LOG(LOG_LEVEL_ERROR, "Error receiving desktop name");
+            rv = 1;
+        }
+        else
+        {
+            g_memcpy(v->mod_name, s->data, name_len);
+            v->mod_name[name_len] = 0;
+
+            init_single_screen_layout(width, height, &v->server_layout);
+        }
+    }
+    free_stream(s);
+    return rv;
+}
+
+/******************************************************************************/
+/**
+ * Sets the pixel format (RFC6143 7.5.1)
+ *
+ * @param v Module
+ * @return 0 for success
+ */
+static int
+set_pixel_format(struct vnc *v)
+{
+    struct
+    {
+        unsigned char bits_per_pixel;
+        unsigned char depth;
+        unsigned char true_color;
+        unsigned short red_max;
+        unsigned short green_max;
+        unsigned short blue_max;
+        unsigned char red_shift;
+        unsigned char green_shift;
+        unsigned char blue_shift;
+    } pixel_format = {0};
+
+    int rv;
+    struct stream *s;
+
+    if (v->server_bpp == 8)
+    {
+        pixel_format.bits_per_pixel = 8;
+        pixel_format.depth = 8;
+    }
+    else if (v->server_bpp == 15)
+    {
+        pixel_format.bits_per_pixel = 16;
+        pixel_format.depth = 15;
+        pixel_format.true_color = 1;
+        pixel_format.red_max = 31;
+        pixel_format.green_max = 31;
+        pixel_format.blue_max = 31;
+        pixel_format.red_shift = 10;
+        pixel_format.green_shift = 5;
+        pixel_format.blue_shift = 0;
+    }
+    else if (v->server_bpp == 16)
+    {
+        pixel_format.bits_per_pixel = 16;
+        pixel_format.depth = 16;
+        pixel_format.true_color = 1;
+        pixel_format.red_max = 31;
+        pixel_format.green_max = 63;
+        pixel_format.blue_max = 31;
+        pixel_format.red_shift = 11;
+        pixel_format.green_shift = 5;
+        pixel_format.blue_shift = 0;
+    }
+    else if (v->server_bpp == 24 || v->server_bpp == 32)
+    {
+        pixel_format.bits_per_pixel = 32;
+        pixel_format.depth = 24;
+        pixel_format.true_color = 1;
+        pixel_format.red_max = 255;
+        pixel_format.green_max = 255;
+        pixel_format.blue_max = 255;
+        pixel_format.red_shift = 16;
+        pixel_format.green_shift = 8;
+        pixel_format.blue_shift = 0;
+    }
+
+    make_stream(s);
+    init_stream(s, 64);
+    out_uint8(s, RFB_C2S_SET_PIXEL_FORMAT);
+    out_uint8s(s, 3); /* pad */
+    /* Now send the pixel data block */
+    out_uint8(s, pixel_format.bits_per_pixel);
+    out_uint8(s, pixel_format.depth);
+#if defined(B_ENDIAN)
+    out_uint8(s, 1); /* big endian */
+#else
+    out_uint8(s, 0); /* big endian */
+#endif
+    out_uint8(s, pixel_format.true_color);
+    out_uint16_be(s, pixel_format.red_max);
+    out_uint16_be(s, pixel_format.green_max);
+    out_uint16_be(s, pixel_format.blue_max);
+    out_uint8(s, pixel_format.red_shift);
+    out_uint8(s, pixel_format.green_shift);
+    out_uint8(s, pixel_format.blue_shift);
+    out_uint8s(s, 3); /* pad */
+    s_mark_end(s);
+    rv = trans_force_write_s(v->trans, s);
+    free_stream(s);
+    return rv;
+}
+
+/******************************************************************************/
+/**
+ * Sets the encodings (RFC6143 7.5.2)
+ *
+ * @param v Module
+ * @return 0 for success
+ */
+static int
+set_encodings(struct vnc *v)
+{
+    encoding_type e[10];
+    unsigned int n = 0;
+    unsigned int i;
+
+    int rv;
+    struct stream *s;
+
+    /* These encodings are always supported */
+    e[n++] = RFB_ENC_RAW;
+    e[n++] = RFB_ENC_COPY_RECT;
+    e[n++] = RFB_ENC_CURSOR;
+    e[n++] = RFB_ENC_DESKTOP_SIZE;
+    if (v->enabled_encodings_mask & MSK_EXTENDED_DESKTOP_SIZE)
+    {
+        e[n++] = RFB_ENC_EXTENDED_DESKTOP_SIZE;
+    }
+    else
+    {
+        LOG(LOG_LEVEL_INFO,
+            "VNC User disabled EXTENDED_DESKTOP_SIZE");
+    }
+
+    make_stream(s);
+    init_stream(s, (int)(4 + sizeof(e)));
+    out_uint8(s, RFB_C2S_SET_ENCODINGS);
+    out_uint8(s, 0);
+    out_uint16_be(s, n); /* Number of encodings following */
+    for (i = 0 ; i < n; ++i)
+    {
+        out_uint32_be(s, e[i]);
+    }
+    s_mark_end(s);
+    rv = trans_force_write_s(v->trans, s);
+    free_stream(s);
+
+    return rv;
+}
+
+/******************************************************************************/
 /*
   return error
 */
@@ -1654,22 +2243,11 @@ lib_mod_connect(struct vnc *v)
     char cursor_mask[32 * (32 / 8)];
     char con_port[256];
     char text[256];
-    char *version_str;
-    char j;
-    struct stream *s;
-    struct stream *pixel_format;
+    unsigned int rfbproto_version;
     int error;
-    int i;
-    int sec_lvl = 0;
-    int version;
-    int n_sec_lvls;
-    int check_sec_result;
     int socket_mode;
 
     g_snprintf(con_port, sizeof(con_port), "%s", v->port);
-
-    v->server_msg(v, "VNC started connecting", 0);
-    check_sec_result = 1;
 
     /* check if bpp is supported for rdp connection */
     switch (v->server_bpp)
@@ -1698,20 +2276,15 @@ lib_mod_connect(struct vnc *v)
         if (g_strcmp(v->ip, "") == 0)
         {
             v->server_msg(v, "VNC error - no IP set for TCP connection", 0);
-            return 1;
+            goto fail;
         }
     }
-
-    make_stream(s);
-    make_stream(pixel_format);
 
     v->trans = trans_create(socket_mode, 8 * 8192, 8192);
     if (v->trans == 0)
     {
         v->server_msg(v, "VNC error: trans_create() failed", 0);
-        free_stream(s);
-        free_stream(pixel_format);
-        return 1;
+        goto fail;
     }
 
     v->sck_closed = 0;
@@ -1721,16 +2294,6 @@ lib_mod_connect(struct vnc *v)
         v->server_msg(v, text, 0);
         g_sleep(v->delay_ms);
     }
-
-    if (socket_mode == TRANS_MODE_TCP)
-    {
-        g_sprintf(text, "VNC connecting to TCP %s %s", v->ip, con_port);
-    }
-    else
-    {
-        g_sprintf(text, "VNC connecting to local socket %s", con_port);
-    }
-    v->server_msg(v, text, 0);
 
     v->trans->si = v->si;
     v->trans->my_source = XRDP_SOURCE_MOD;
@@ -1742,418 +2305,94 @@ lib_mod_connect(struct vnc *v)
         g_snprintf(text, sizeof(text), "Error connecting to VNC server [%s]",
                    g_get_strerror());
         v->server_msg(v, text, 0);
-        free_stream(s);
-        free_stream(pixel_format);
-        return 1;
+        goto fail;
     }
 
-    v->server_msg(v, "VNC tcp connected", 0);
+    if (socket_mode == TRANS_MODE_TCP)
+    {
+        g_sprintf(text, "VNC connected to TCP %s %s", v->ip, con_port);
+    }
+    else
+    {
+        g_sprintf(text, "VNC connected to local socket %s", con_port);
+    }
+    v->server_msg(v, text, 0);
+
     /* protocol version */
-    init_stream(s, 8192);
-    error = trans_force_read_s(v->trans, s, 12);
-    if (error == 0)
+    unsigned char next_char;
+    if ((rfbproto_version = negotiate_protocol_version(v, &next_char)) == 0)
     {
-        in_uint8p(s, version_str, 12);
-        if (g_strncmp(version_str, "RFB 003.00", 10) != 0)
-        {
-            version_str[11] = '\0';
-            LOG(LOG_LEVEL_ERROR, "Invalid server version string %s", version_str);
-            error = 1;
-        }
-    }
-    if (error == 0)
-    {
-        version = version_str[10] - '0';
-        if (version != 3 && version != 7 && version != 8)
-        {
-            LOG(LOG_LEVEL_ERROR, "Unsupported VNC version 3.%d", version);
-            error = 1;
-        }
-    }
-    if (error == 0)
-    {
-        init_stream(s, 8192);
-        out_uint8p(s, version_str, 12);
-        s_mark_end(s);
-        error = trans_force_write_s(v->trans, s);
+        v->server_msg(v, "Error negotiating VNC version", 0);
+        goto fail;
     }
 
-    /* sec type */
-    if (error == 0)
+    if (negotiate_security_type(v, rfbproto_version, next_char) ==
+            SEC_TYPE_INVALID)
     {
-        if (version == 3)
-        {
-            // The server chooses the security type
-            error = trans_force_read_s(v->trans, s, 4);
-            if (error == 0)
-            {
-                in_uint32_be(s, sec_lvl);
-            }
-        }
-        else if (version >= 7)
-        {
-            // The client chooses the security type
-            error = trans_force_read_s(v->trans, s, 1);
-            if (error == 0)
-            {
-                in_uint8(s, n_sec_lvls);
-                if (n_sec_lvls > 0)
-                {
-                    error = trans_force_read_s(v->trans, s, n_sec_lvls);
-                }
-                else
-                {
-                    // Read size of reason
-                    error = trans_force_read_s(v->trans, s, 4);
-                    if (error == 0)
-                    {
-                        in_uint32_be(s, i);
-                        error = trans_force_read_s(v->trans, s, i);
-                        in_uint8a(s, text, i);
-                        text[i] = '\0';
-                        LOG(LOG_LEVEL_ERROR, "Connection closed by server with reason: %s", text);
-                        error = 1;
-                    }
-                }
-            }
-            if (error == 0)
-            {
-                for (; n_sec_lvls > 0; --n_sec_lvls)
-                {
-                    in_uint8(s, j);
-                    // Choose the highest security level that we support
-                    if (j > sec_lvl && j <= 2)
-                    {
-                        sec_lvl = j;
-                    }
-                }
-                init_stream(s, 8192);
-                out_uint8(s, sec_lvl);
-                s_mark_end(s);
-
-                error = trans_force_write_s(v->trans, s);
-            }
-        }
+        // An error has been logged
+        v->server_msg(v, "Error negotiating security type", 0);
+        goto fail;
     }
 
-    if (error == 0)
+    if (send_client_init(v, 1) != 0)
     {
-        g_sprintf(text, "VNC security level is %d (1 = none, 2 = standard)", sec_lvl);
-        v->server_msg(v, text, 0);
-
-        if (sec_lvl == 1) /* none */
-        {
-            if (version >= 8)
-            {
-                check_sec_result = 1;
-            }
-            else
-            {
-                check_sec_result = 0;
-            }
-        }
-        else if (sec_lvl == 2) /* dec the password and the server random */
-        {
-            init_stream(s, 8192);
-            if (guid_is_set(&v->guid))
-            {
-                char guid_str[GUID_STR_SIZE];
-                guid_to_str(&v->guid, guid_str);
-                rfbHashEncryptBytes(s->data, guid_str);
-            }
-            else
-            {
-                rfbEncryptBytes(s->data, v->password);
-            }
-            s->p += 16;
-            s_mark_end(s);
-            error = trans_force_write_s(v->trans, s);
-            check_sec_result = 1; // not needed
-        }
-        else if (sec_lvl == 0)
-        {
-            LOG(LOG_LEVEL_ERROR, "VNC Server will disconnect");
-            error = 1;
-        }
-        else
-        {
-            LOG(LOG_LEVEL_ERROR, "VNC unsupported security level %d", sec_lvl);
-            error = 1;
-        }
+        v->server_msg(v, "Error sending client init", 0);
+        goto fail;
     }
 
-    if (error != 0)
+    if (receive_server_init(v) != 0)
     {
-        LOG(LOG_LEVEL_ERROR, "VNC error %d after security negotiation",
-            error);
+        v->server_msg(v, "Error receiving server init", 0);
+        goto fail;
     }
 
-    if (error == 0 && check_sec_result)
+    if (set_pixel_format(v) != 0)
     {
-        /* sec result */
-        init_stream(s, 8192);
-        error = trans_force_read_s(v->trans, s, 4);
-
-        if (error == 0)
-        {
-            in_uint32_be(s, i);
-
-            if (i != 0)
-            {
-                v->server_msg(v, "VNC password failed", 0);
-                error = 2;
-            }
-            else
-            {
-                v->server_msg(v, "VNC password ok", 0);
-            }
-        }
+        v->server_msg(v, "Error setting pixel format", 0);
+        goto fail;
     }
 
-    if (error == 0)
+    if (set_encodings(v) != 0)
     {
-        v->server_msg(v, "VNC sending share flag", 0);
-        init_stream(s, 8192);
-        out_uint8(s, 1);
-        s_mark_end(s);
-        error = trans_force_write_s(v->trans, s); /* share flag */
-    }
-    else
-    {
-        LOG(LOG_LEVEL_ERROR, "VNC error before sending share flag");
+        v->server_msg(v, "Error setting encodings", 0);
+        goto fail;
     }
 
-    if (error == 0)
+    v->resize_supported = VRSS_UNKNOWN;
+    v->resize_status = VRS_WAITING_FOR_FIRST_UPDATE;
+    if (send_update_request_for_resize_status(v) != 0)
     {
-        v->server_msg(v, "VNC receiving server init", 0);
-        init_stream(s, 8192);
-        error = trans_force_read_s(v->trans, s, 4); /* server init */
-    }
-    else
-    {
-        LOG(LOG_LEVEL_ERROR, "VNC error before receiving server init");
+        v->server_msg(v, "Error sending resize support request", 0);
+        goto fail;
     }
 
-    if (error == 0)
+    /* set almost null cursor, this is the little dot cursor */
+    g_memset(cursor_data, 0, 32 * (32 * 3));
+    g_memset(cursor_data + (32 * (32 * 3) - 1 * 32 * 3), 0xff, 9);
+    g_memset(cursor_data + (32 * (32 * 3) - 2 * 32 * 3), 0xff, 9);
+    g_memset(cursor_data + (32 * (32 * 3) - 3 * 32 * 3), 0xff, 9);
+    g_memset(cursor_mask, 0xff, 32 * (32 / 8));
+    if (v->server_set_cursor(v, 3, 3, cursor_data, cursor_mask) != 0)
     {
-        int width;
-        int height;
-        in_uint16_be(s, width);
-        in_uint16_be(s, height);
-        init_single_screen_layout(width, height, &v->server_layout);
-
-        init_stream(pixel_format, 8192);
-        v->server_msg(v, "VNC receiving pixel format", 0);
-        error = trans_force_read_s(v->trans, pixel_format, 16);
-    }
-    else
-    {
-        LOG(LOG_LEVEL_ERROR, "VNC error before receiving pixel format");
+        v->server_msg(v, "Error sending cursor", 0);
+        goto fail;
     }
 
-    if (error == 0)
-    {
-        init_stream(s, 8192);
-        v->server_msg(v, "VNC receiving name length", 0);
-        error = trans_force_read_s(v->trans, s, 4); /* name len */
-    }
-    else
-    {
-        LOG(LOG_LEVEL_ERROR, "VNC error before receiving name length");
-    }
+    v->server_msg(v, "VNC connection complete, connected ok", 0);
+    vnc_clip_open_clip_channel(v);
 
-    if (error == 0)
-    {
-        in_uint32_be(s, i);
+    v->trans->trans_data_in = lib_data_in;
+    v->trans->header_size = 1;
+    v->trans->callback_data = v;
 
-        if (i > 255 || i < 0)
-        {
-            error = 3;
-        }
-        else
-        {
-            init_stream(s, 8192);
-            v->server_msg(v, "VNC receiving name", 0);
-            error = trans_force_read_s(v->trans, s, i); /* name len */
-            g_memcpy(v->mod_name, s->data, i);
-            v->mod_name[i] = 0;
-        }
-    }
-    else
-    {
-        LOG(LOG_LEVEL_ERROR, "VNC error before receiving name");
-    }
+    return 0;
 
-    /* should be connected */
-    if (error == 0)
-    {
-        init_stream(s, 8192);
-        out_uint8(s, RFB_C2S_SET_PIXEL_FORMAT);
-        out_uint8(s, 0);
-        out_uint8(s, 0);
-        out_uint8(s, 0);
-        init_stream(pixel_format, 8192);
+fail:
+    trans_delete(v->trans);
+    v->trans = NULL;
+    v->server_msg(v, "VNC error - problem connecting", 0);
 
-        if (v->server_bpp == 8)
-        {
-            out_uint8(pixel_format, 8); /* bits per pixel */
-            out_uint8(pixel_format, 8); /* depth */
-#if defined(B_ENDIAN)
-            out_uint8(pixel_format, 1); /* big endian */
-#else
-            out_uint8(pixel_format, 0); /* big endian */
-#endif
-            out_uint8(pixel_format, 0); /* true color flag */
-            out_uint16_be(pixel_format, 0); /* red max */
-            out_uint16_be(pixel_format, 0); /* green max */
-            out_uint16_be(pixel_format, 0); /* blue max */
-            out_uint8(pixel_format, 0); /* red shift */
-            out_uint8(pixel_format, 0); /* green shift */
-            out_uint8(pixel_format, 0); /* blue shift */
-            out_uint8s(pixel_format, 3); /* pad */
-        }
-        else if (v->server_bpp == 15)
-        {
-            out_uint8(pixel_format, 16); /* bits per pixel */
-            out_uint8(pixel_format, 15); /* depth */
-#if defined(B_ENDIAN)
-            out_uint8(pixel_format, 1); /* big endian */
-#else
-            out_uint8(pixel_format, 0); /* big endian */
-#endif
-            out_uint8(pixel_format, 1); /* true color flag */
-            out_uint16_be(pixel_format, 31); /* red max */
-            out_uint16_be(pixel_format, 31); /* green max */
-            out_uint16_be(pixel_format, 31); /* blue max */
-            out_uint8(pixel_format, 10); /* red shift */
-            out_uint8(pixel_format, 5); /* green shift */
-            out_uint8(pixel_format, 0); /* blue shift */
-            out_uint8s(pixel_format, 3); /* pad */
-        }
-        else if (v->server_bpp == 16)
-        {
-            out_uint8(pixel_format, 16); /* bits per pixel */
-            out_uint8(pixel_format, 16); /* depth */
-#if defined(B_ENDIAN)
-            out_uint8(pixel_format, 1); /* big endian */
-#else
-            out_uint8(pixel_format, 0); /* big endian */
-#endif
-            out_uint8(pixel_format, 1); /* true color flag */
-            out_uint16_be(pixel_format, 31); /* red max */
-            out_uint16_be(pixel_format, 63); /* green max */
-            out_uint16_be(pixel_format, 31); /* blue max */
-            out_uint8(pixel_format, 11); /* red shift */
-            out_uint8(pixel_format, 5); /* green shift */
-            out_uint8(pixel_format, 0); /* blue shift */
-            out_uint8s(pixel_format, 3); /* pad */
-        }
-        else if (v->server_bpp == 24 || v->server_bpp == 32)
-        {
-            out_uint8(pixel_format, 32); /* bits per pixel */
-            out_uint8(pixel_format, 24); /* depth */
-#if defined(B_ENDIAN)
-            out_uint8(pixel_format, 1); /* big endian */
-#else
-            out_uint8(pixel_format, 0); /* big endian */
-#endif
-            out_uint8(pixel_format, 1); /* true color flag */
-            out_uint16_be(pixel_format, 255); /* red max */
-            out_uint16_be(pixel_format, 255); /* green max */
-            out_uint16_be(pixel_format, 255); /* blue max */
-            out_uint8(pixel_format, 16); /* red shift */
-            out_uint8(pixel_format, 8); /* green shift */
-            out_uint8(pixel_format, 0); /* blue shift */
-            out_uint8s(pixel_format, 3); /* pad */
-        }
-
-        out_uint8a(s, pixel_format->data, 16);
-        v->server_msg(v, "VNC sending pixel format", 0);
-        s_mark_end(s);
-        error = trans_force_write_s(v->trans, s);
-    }
-
-    if (error == 0)
-    {
-        encoding_type e[10];
-        unsigned int n = 0;
-        unsigned int i;
-
-        /* These encodings are always supported */
-        e[n++] = RFB_ENC_RAW;
-        e[n++] = RFB_ENC_COPY_RECT;
-        e[n++] = RFB_ENC_CURSOR;
-        e[n++] = RFB_ENC_DESKTOP_SIZE;
-        if (v->enabled_encodings_mask & MSK_EXTENDED_DESKTOP_SIZE)
-        {
-            e[n++] = RFB_ENC_EXTENDED_DESKTOP_SIZE;
-        }
-        else
-        {
-            LOG(LOG_LEVEL_INFO,
-                "VNC User disabled EXTENDED_DESKTOP_SIZE");
-        }
-
-        init_stream(s, 8192);
-        out_uint8(s, RFB_C2S_SET_ENCODINGS);
-        out_uint8(s, 0);
-        out_uint16_be(s, n); /* Number of encodings following */
-        for (i = 0 ; i < n; ++i)
-        {
-            out_uint32_be(s, e[i]);
-        }
-        s_mark_end(s);
-        error = trans_force_write_s(v->trans, s);
-    }
-
-    if (error == 0)
-    {
-        v->resize_supported = VRSS_UNKNOWN;
-        v->resize_status = VRS_WAITING_FOR_FIRST_UPDATE;
-        error = send_update_request_for_resize_status(v);
-    }
-
-    if (error == 0)
-    {
-        /* set almost null cursor, this is the little dot cursor */
-        g_memset(cursor_data, 0, 32 * (32 * 3));
-        g_memset(cursor_data + (32 * (32 * 3) - 1 * 32 * 3), 0xff, 9);
-        g_memset(cursor_data + (32 * (32 * 3) - 2 * 32 * 3), 0xff, 9);
-        g_memset(cursor_data + (32 * (32 * 3) - 3 * 32 * 3), 0xff, 9);
-        g_memset(cursor_mask, 0xff, 32 * (32 / 8));
-        v->server_msg(v, "VNC sending cursor", 0);
-        error = v->server_set_cursor(v, 3, 3, cursor_data, cursor_mask);
-    }
-
-    free_stream(s);
-    free_stream(pixel_format);
-
-    if (error == 0)
-    {
-        v->server_msg(v, "VNC connection complete, connected ok", 0);
-        vnc_clip_open_clip_channel(v);
-    }
-    else
-    {
-        v->server_msg(v, "VNC error - problem connecting", 0);
-    }
-
-    if (error != 0)
-    {
-        trans_delete(v->trans);
-        v->trans = 0;
-        v->server_msg(v, "some problem", 0);
-        return 1;
-    }
-    else
-    {
-        v->server_msg(v, "connected ok", 0);
-        v->trans->trans_data_in = lib_data_in;
-        v->trans->header_size = 1;
-        v->trans->callback_data = v;
-    }
-
-    return error;
+    return 1;
 }
 
 /******************************************************************************/
