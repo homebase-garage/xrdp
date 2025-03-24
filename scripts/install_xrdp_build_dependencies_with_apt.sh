@@ -107,7 +107,7 @@ in
                 ;;
         esac
         apt-get update
-        apt-get upgrade
+        apt-get -y upgrade
         ;;
 
     i386)
