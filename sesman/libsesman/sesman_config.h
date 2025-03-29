@@ -166,6 +166,11 @@ struct config_sessions
      * @brief session allocation policy
      */
     unsigned int policy;
+    /**
+     * @var start wait time
+     * @brief Wait time to make sure a session has started.
+     */
+    unsigned int startup_wait_time;
 };
 
 /**

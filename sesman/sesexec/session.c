@@ -601,6 +601,65 @@ fork_child(
 }
 
 /******************************************************************************/
+static int
+process_startup_wait_time(struct session_data *sd)
+{
+    int rv = 0;
+    int robjs_count;
+    intptr_t robjs[10];
+    unsigned int start = g_get_elapsed_ms();
+
+    LOG(LOG_LEVEL_INFO, "Waiting for %u ms for session to start",
+        g_cfg->sess.startup_wait_time);
+    while (1)
+    {
+        unsigned int elapsed = g_get_elapsed_ms() - start;
+        if (elapsed >= g_cfg->sess.startup_wait_time)
+        {
+            break;
+        }
+
+        robjs_count = 0;
+        robjs[robjs_count++] = g_term_event;
+        robjs[robjs_count++] = g_sigchld_event;
+
+        if (g_obj_wait(robjs, robjs_count, NULL, 0,
+                       g_cfg->sess.startup_wait_time - elapsed) != 0)
+        {
+            /* should not get here */
+            LOG(LOG_LEVEL_WARNING, "process_startup_wait_time: "
+                "Unexpected error from g_obj_wait()");
+            g_sleep(100);
+            continue;
+        }
+
+        if (g_is_wait_obj_set(g_term_event)) /* term */
+        {
+            // Simulate success for now, but leave g_term_event set. The
+            // main loop will also pick up the terminate event and the
+            // session will be closed normally
+            break;
+        }
+
+        if (g_is_wait_obj_set(g_sigchld_event)) /* SIGCHLD */
+        {
+            g_reset_wait_obj(g_sigchld_event);
+            session_process_sigchld_event(sd);
+            if (sd->win_mgr < 0)
+            {
+                // Session has failed in the StartupWaitTime
+                // Wait for the rest of the session to finish
+                rv = 1;
+                session_send_term(sd, 1);
+                break;
+            }
+        }
+    }
+
+    return rv;
+}
+
+/******************************************************************************/
 static enum scp_screate_status
 session_start_wrapped(struct login_info *login_info,
                       const struct session_parameters *s,
@@ -709,17 +768,27 @@ session_start_wrapped(struct login_info *login_info,
                 chansrv_pid = fork_child(start_chansrv, login_info,
                                          s, display_pid);
 
-                // Tell the caller we've started
-                LOG(LOG_LEVEL_INFO,
-                    "Session in progress on display :%d. Waiting until the "
-                    "window manager (pid %d) exits to end the session",
-                    s->display, window_manager_pid);
-
                 sd->win_mgr = window_manager_pid;
                 sd->x_server = display_pid;
                 sd->chansrv = chansrv_pid;
                 sd->start_time = time(NULL);
-                status = E_SCP_SCREATE_OK;
+
+                if (process_startup_wait_time(sd) == 0)
+                {
+                    // Tell the caller we've started
+                    LOG(LOG_LEVEL_INFO,
+                        "Session in progress on display :%d. Waiting until the "
+                        "window manager (pid %d) exits to end the session",
+                        s->display, window_manager_pid);
+
+                    status = E_SCP_SCREATE_OK;
+                }
+                else
+                {
+                    LOG(LOG_LEVEL_ERROR,
+                        "Session failed during startup wait time");
+                    status = E_SCP_SCREATE_SESSION_FAIL;
+                }
             }
         }
     }
@@ -883,10 +952,19 @@ exit_status_to_str(const struct proc_exit_status *e, char buff[], int bufflen)
 }
 
 /******************************************************************************/
-void
-session_process_child_exit(struct session_data *sd,
-                           int pid,
-                           const struct proc_exit_status *e)
+/**
+ * Processes an exited child
+ *
+ * The PID of the child process is removed from the session_data.
+ *
+ * @param sd session_data for this session
+ * @param pid PID of exited process
+ * @param e Exit status of the exited process
+ */
+static void
+process_child_exit(struct session_data *sd,
+                   int pid,
+                   const struct proc_exit_status *e)
 {
     if (pid == sd->x_server)
     {
@@ -957,6 +1035,20 @@ session_process_child_exit(struct session_data *sd,
 }
 
 /******************************************************************************/
+void
+session_process_sigchld_event(struct session_data *sd)
+{
+    struct proc_exit_status e;
+    int pid;
+
+    // Check for any finished children
+    while ((pid = g_waitchild(&e)) > 0)
+    {
+        process_child_exit(sd, pid, &e);
+    }
+}
+
+/******************************************************************************/
 unsigned int
 session_active(const struct session_data *sd)
 {
@@ -982,14 +1074,34 @@ session_get_parameters(const struct session_data *sd)
 
 /******************************************************************************/
 void
-session_send_term(struct session_data *sd)
+session_send_term(struct session_data *sd, int wait_for_all)
 {
-    if (sd != NULL && sd->win_mgr > 0)
+    if (sd != NULL)
     {
-        // Killing the window manager only is appropriate here.
-        // When we process SIGCHLD for the windowe manager, we
-        // will kill other processes as appropriate
-        g_sigterm(sd->win_mgr);
+        if (sd->win_mgr > 0)
+        {
+            // Killing the window manager only is appropriate here.
+            // When we process SIGCHLD for the window manager, we
+            // will kill other processes as appropriate
+            g_sigterm(sd->win_mgr);
+        }
+
+        while (session_active(sd))
+        {
+            /* Don't check SIGTERM - we shouldn't be here long */
+            if (g_obj_wait(&g_sigchld_event, 1, NULL, 0, -1) != 0)
+            {
+                /* should not get here */
+                LOG(LOG_LEVEL_WARNING, "session_send_term: "
+                    "Unexpected error from g_obj_wait()");
+                g_sleep(100);
+            }
+            else
+            {
+                g_reset_wait_obj(g_sigchld_event);
+                session_process_sigchld_event(sd);
+            }
+        }
     }
 }
 

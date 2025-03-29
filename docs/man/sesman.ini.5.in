@@ -237,6 +237,16 @@ Note that the \fBU\fR and \fBB\fR criteria cannot be turned
 off. \fBDisplaySize\fR refers to the initial geometry of a connection,
 as actual display sizes can change dynamically.
 
+.TP
+\fBStartupWaitTime\fR=\fInumber\fR
+Milliseconds to wait to ensure the session has started. The default is 1500
+milli-seconds.
+.IP
+Making this larger does not increase the session startup time, but
+will increase the time for the first connection to a session.
+The value can be set to zero. If this is done, sessions which fail
+early will not be reported to the user.
+
 .SH "SECURITY"
 Following parameters can be used in the \fB[Security]\fR section.
 

@@ -78,18 +78,18 @@ session_start(struct login_info *login_info,
               struct session_data **session_data);
 
 /**
- * Processes an exited child process
+ * Processes a SIGCHLD event
  *
- * The PID of the child process is removed from the session_data.
+ * Any pending SIGCHLD events are processed.
+ *
+ * The PID of a failed child process is removed from the session_data.
  *
  * @param sd session_data for this session
  * @param pid PID of exited process
  * @param e Exit status of the exited process
  */
 void
-session_process_child_exit(struct session_data *sd,
-                           int pid,
-                           const struct proc_exit_status *e);
+session_process_sigchld_event(struct session_data *sd);
 
 /**
  * Returns a count of active processes in the session
@@ -124,9 +124,11 @@ session_get_parameters(const struct session_data *sd);
  * Ask a session to terminate by signalling the window manager
  *
  * @param sd session_data for this session
+ * @param wait_for_all != 0 to wait for all processes in the session
+ *                     to terminate
  */
 void
-session_send_term(struct session_data *sd);
+session_send_term(struct session_data *sd, int wait_for_all);
 
 /**
  * Frees a session_data object

@@ -268,39 +268,6 @@ sesexec_is_ecp_active(void)
 
 /******************************************************************************/
 static void
-process_sigchld_event(void)
-{
-    struct proc_exit_status e;
-    int pid;
-
-    // Check for any finished children
-    while ((pid = g_waitchild(&e)) > 0)
-    {
-        session_process_child_exit(g_session_data, pid, &e);
-    }
-}
-
-/******************************************************************************/
-static void
-sesexec_terminate_session_and_wait(void)
-{
-    session_send_term(g_session_data);
-    do
-    {
-        g_sleep(1000);
-        // Process SIGCHLD events while waiting for the session
-        // to exit.
-        if (g_is_wait_obj_set(g_sigchld_event))
-        {
-            g_reset_wait_obj(g_sigchld_event);
-            process_sigchld_event();
-        }
-    }
-    while (session_active(g_session_data));
-}
-
-/******************************************************************************/
-static void
 sesexec_main_loop_cleanup(void)
 {
     login_info_free(g_login_info);
@@ -314,7 +281,7 @@ sesexec_main_loop_cleanup(void)
     {
         LOG(LOG_LEVEL_INFO,
             "Stopping session on xrdp-sesexec exit");
-        sesexec_terminate_session_and_wait();
+        session_send_term(g_session_data, 1);
     }
     session_data_free(g_session_data);
 }
@@ -400,7 +367,7 @@ sesexec_main_loop(void)
             // See whether the session goes from active to inactive
             // after processing SIGCHLD
             int session_was_active = session_active(g_session_data);
-            process_sigchld_event();
+            session_process_sigchld_event(g_session_data);
             if (session_was_active && !session_active(g_session_data))
             {
                 // We've finished the session. Tell sesman and
