@@ -698,7 +698,7 @@ xrdp_init_xkb_layout(struct xrdp_client_info *client_info)
             int rdp_layout_id;
             item = (char *)list_get_item(items, index);
             value = (char *)list_get_item(values, index);
-            rdp_layout_id = g_htoi(value);
+            rdp_layout_id = g_atoix(value);
             if (rdp_layout_id == client_info->keylayout)
             {
                 g_strncpy(rdp_layout, item, 255);
@@ -714,7 +714,7 @@ xrdp_init_xkb_layout(struct xrdp_client_info *client_info)
             {
                 item = (char *)list_get_item(items, index);
                 value = (char *)list_get_item(values, index);
-                int rdp_layout_id = g_htoi(value);
+                int rdp_layout_id = g_atoix(value);
                 if (rdp_layout_id == alt_layout)
                 {
                     g_strncpy(rdp_layout, item, 255);

@@ -443,42 +443,6 @@ xrdp_wm_set_pointer(struct xrdp_wm *self, int cache_idx)
 }
 
 /*****************************************************************************/
-/* convert hex string to int */
-unsigned int
-xrdp_wm_htoi (const char *ptr)
-{
-    unsigned int value = 0;
-    char ch = *ptr;
-
-    while (ch == ' ' || ch == '\t')
-    {
-        ch = *(++ptr);
-    }
-
-    for (;;)
-    {
-        if (ch >= '0' && ch <= '9')
-        {
-            value = (value << 4) + (ch - '0');
-        }
-        else if (ch >= 'A' && ch <= 'F')
-        {
-            value = (value << 4) + (ch - 'A' + 10);
-        }
-        else if (ch >= 'a' && ch <= 'f')
-        {
-            value = (value << 4) + (ch - 'a' + 10);
-        }
-        else
-        {
-            return value;
-        }
-
-        ch = *(++ptr);
-    }
-}
-
-/*****************************************************************************/
 int
 xrdp_wm_load_static_colors_plus(struct xrdp_wm *self, char *autorun_name)
 {
@@ -529,47 +493,47 @@ xrdp_wm_load_static_colors_plus(struct xrdp_wm *self, char *autorun_name)
                     if (g_strcasecmp(val, "black") == 0)
                     {
                         val = (char *)list_get_item(values, index);
-                        self->black = HCOLOR(self->screen->bpp, xrdp_wm_htoi(val));
+                        self->black = HCOLOR(self->screen->bpp, g_htoi(val));
                     }
                     else if (g_strcasecmp(val, "grey") == 0)
                     {
                         val = (char *)list_get_item(values, index);
-                        self->grey = HCOLOR(self->screen->bpp, xrdp_wm_htoi(val));
+                        self->grey = HCOLOR(self->screen->bpp, g_htoi(val));
                     }
                     else if (g_strcasecmp(val, "dark_grey") == 0)
                     {
                         val = (char *)list_get_item(values, index);
-                        self->dark_grey = HCOLOR(self->screen->bpp, xrdp_wm_htoi(val));
+                        self->dark_grey = HCOLOR(self->screen->bpp, g_htoi(val));
                     }
                     else if (g_strcasecmp(val, "blue") == 0)
                     {
                         val = (char *)list_get_item(values, index);
-                        self->blue = HCOLOR(self->screen->bpp, xrdp_wm_htoi(val));
+                        self->blue = HCOLOR(self->screen->bpp, g_htoi(val));
                     }
                     else if (g_strcasecmp(val, "dark_blue") == 0)
                     {
                         val = (char *)list_get_item(values, index);
-                        self->dark_blue = HCOLOR(self->screen->bpp, xrdp_wm_htoi(val));
+                        self->dark_blue = HCOLOR(self->screen->bpp, g_htoi(val));
                     }
                     else if (g_strcasecmp(val, "white") == 0)
                     {
                         val = (char *)list_get_item(values, index);
-                        self->white = HCOLOR(self->screen->bpp, xrdp_wm_htoi(val));
+                        self->white = HCOLOR(self->screen->bpp, g_htoi(val));
                     }
                     else if (g_strcasecmp(val, "red") == 0)
                     {
                         val = (char *)list_get_item(values, index);
-                        self->red = HCOLOR(self->screen->bpp, xrdp_wm_htoi(val));
+                        self->red = HCOLOR(self->screen->bpp, g_htoi(val));
                     }
                     else if (g_strcasecmp(val, "green") == 0)
                     {
                         val = (char *)list_get_item(values, index);
-                        self->green = HCOLOR(self->screen->bpp, xrdp_wm_htoi(val));
+                        self->green = HCOLOR(self->screen->bpp, g_htoi(val));
                     }
                     else if (g_strcasecmp(val, "background") == 0)
                     {
                         val = (char *)list_get_item(values, index);
-                        self->background = HCOLOR(self->screen->bpp, xrdp_wm_htoi(val));
+                        self->background = HCOLOR(self->screen->bpp, g_htoi(val));
                     }
                     else if (g_strcasecmp(val, "autorun") == 0)
                     {

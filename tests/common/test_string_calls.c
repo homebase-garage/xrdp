@@ -1141,6 +1141,28 @@ END_TEST
 
 /******************************************************************************/
 
+START_TEST(test_htoi__all)
+{
+    // Invalid 1st character
+    ck_assert_int_eq(g_htoi(""), 0);
+    ck_assert_int_eq(g_htoi("z"), 0);
+    // Test border conditions (assumes ASCII) */
+    ck_assert_int_eq(g_htoi("99/"), 0x99); /* '/' = one-before '0' */
+    ck_assert_int_eq(g_htoi("99:"), 0x99); /* '/' = one-after '9' */
+    ck_assert_int_eq(g_htoi("99@"), 0x99); /* '#' = one-before 'A' */
+    ck_assert_int_eq(g_htoi("99G"), 0x99); /* 'G' = one-after 'F' */
+    ck_assert_int_eq(g_htoi("99`"), 0x99); /* '`' = one-before 'a' */
+    ck_assert_int_eq(g_htoi("99g"), 0x99); /* 'g' = one-after 'f' */
+
+    // Test all valid characters and shifting is OK */
+    ck_assert_int_eq(g_htoi("01234567"), 0x01234567);
+    ck_assert_int_eq(g_htoi("8ABCDEFa"), 0x8ABCDEFa);
+    ck_assert_int_eq(g_htoi("bcdef"), 0xbcdef);
+}
+END_TEST
+
+/******************************************************************************/
+
 Suite *
 make_suite_test_string(void)
 {
@@ -1152,6 +1174,7 @@ make_suite_test_string(void)
     TCase *tc_char2bm;
     TCase *tc_strtrim;
     TCase *tc_sigs;
+    TCase *tc_htoi;
 
     s = suite_create("String");
 
@@ -1229,6 +1252,10 @@ make_suite_test_string(void)
     suite_add_tcase(s, tc_sigs);
     tcase_add_test(tc_sigs, test_sigs__common);
     tcase_add_test(tc_sigs, test_sigs__bigint);
+
+    tc_htoi = tcase_create("g_htoi");
+    suite_add_tcase(s, tc_htoi);
+    tcase_add_test(tc_htoi, test_htoi__all);
 
     return s;
 }

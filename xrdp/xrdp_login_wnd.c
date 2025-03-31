@@ -1074,8 +1074,8 @@ load_xrdp_config(struct xrdp_config *config, const char *xrdp_ini, int bpp)
     globals->ini_version = 1;
     globals->default_dpi = 96;
 
-    globals->ls_top_window_bg_color = HCOLOR(bpp, xrdp_wm_htoi("009cb5"));
-    globals->ls_bg_color = HCOLOR(bpp, xrdp_wm_htoi("dedede"));
+    globals->ls_top_window_bg_color = HCOLOR(bpp, g_htoi("009cb5"));
+    globals->ls_bg_color = HCOLOR(bpp, g_htoi("dedede"));
     globals->ls_unscaled.width = 350;
     globals->ls_unscaled.height = 350;
     globals->ls_background_transform = XBLT_NONE;
@@ -1214,47 +1214,47 @@ load_xrdp_config(struct xrdp_config *config, const char *xrdp_ini, int bpp)
 
         else if (g_strncmp(n, "grey", 64) == 0)
         {
-            globals->grey = xrdp_wm_htoi(v);
+            globals->grey = g_htoi(v);
         }
 
         else if (g_strncmp(n, "black", 64) == 0)
         {
-            globals->black = xrdp_wm_htoi(v);
+            globals->black = g_htoi(v);
         }
 
         else if (g_strncmp(n, "dark_grey", 64) == 0)
         {
-            globals->dark_grey = xrdp_wm_htoi(v);
+            globals->dark_grey = g_htoi(v);
         }
 
         else if (g_strncmp(n, "blue", 64) == 0)
         {
-            globals->blue = xrdp_wm_htoi(v);
+            globals->blue = g_htoi(v);
         }
 
         else if (g_strncmp(n, "dark_blue", 64) == 0)
         {
-            globals->dark_blue = xrdp_wm_htoi(v);
+            globals->dark_blue = g_htoi(v);
         }
 
         else if (g_strncmp(n, "white", 64) == 0)
         {
-            globals->white = xrdp_wm_htoi(v);
+            globals->white = g_htoi(v);
         }
 
         else if (g_strncmp(n, "red", 64) == 0)
         {
-            globals->red = xrdp_wm_htoi(v);
+            globals->red = g_htoi(v);
         }
 
         else if (g_strncmp(n, "green", 64) == 0)
         {
-            globals->green = xrdp_wm_htoi(v);
+            globals->green = g_htoi(v);
         }
 
         else if (g_strncmp(n, "background", 64) == 0)
         {
-            globals->background = xrdp_wm_htoi(v);
+            globals->background = g_htoi(v);
         }
 
         /* misc stuff */
@@ -1313,7 +1313,7 @@ load_xrdp_config(struct xrdp_config *config, const char *xrdp_ini, int bpp)
 
         else if (g_strncmp(n, "ls_top_window_bg_color", 64) == 0)
         {
-            globals->ls_top_window_bg_color = HCOLOR(bpp, xrdp_wm_htoi(v));
+            globals->ls_top_window_bg_color = HCOLOR(bpp, g_htoi(v));
         }
 
         else if (g_strncmp(n, "ls_width", 64) == 0)
@@ -1328,7 +1328,7 @@ load_xrdp_config(struct xrdp_config *config, const char *xrdp_ini, int bpp)
 
         else if (g_strncmp(n, "ls_bg_color", 64) == 0)
         {
-            globals->ls_bg_color = HCOLOR(bpp, xrdp_wm_htoi(v));
+            globals->ls_bg_color = HCOLOR(bpp, g_htoi(v));
         }
 
         else if (g_strncmp(n, "ls_title", 255) == 0)
