@@ -719,7 +719,7 @@ xrdp_init_xkb_layout(struct xrdp_client_info *client_info)
                 {
                     g_strncpy(rdp_layout, item, 255);
                     LOG(LOG_LEVEL_INFO,
-                        "Failed to match layout %08X, but matched %04X to %s",
+                        "Failed to match layout 0x%08X, but matched 0x%04X to %s",
                         client_info->keylayout, alt_layout, rdp_layout);
                     break;
                 }
