@@ -502,82 +502,32 @@ size_t strlcpy(char *dst, const char *src, size_t dsize)
 #endif
 
 /*****************************************************************************/
-int
-g_htoi(char *str)
+unsigned int
+g_htoi(const char *str)
 {
-    int len;
-    int index;
-    int rv;
-    int val;
-    int shift;
-
-    rv = 0;
-    len = strlen(str);
-    index = len - 1;
-    shift = 0;
-
-    while (index >= 0)
+    unsigned int rv = 0;
+    while (*str != '\0')
     {
-        val = 0;
-
-        switch (str[index])
+        char c = *str;
+        unsigned int val;
+        if (c >= '0' && c <= '9')
         {
-            case '1':
-                val = 1;
-                break;
-            case '2':
-                val = 2;
-                break;
-            case '3':
-                val = 3;
-                break;
-            case '4':
-                val = 4;
-                break;
-            case '5':
-                val = 5;
-                break;
-            case '6':
-                val = 6;
-                break;
-            case '7':
-                val = 7;
-                break;
-            case '8':
-                val = 8;
-                break;
-            case '9':
-                val = 9;
-                break;
-            case 'a':
-            case 'A':
-                val = 10;
-                break;
-            case 'b':
-            case 'B':
-                val = 11;
-                break;
-            case 'c':
-            case 'C':
-                val = 12;
-                break;
-            case 'd':
-            case 'D':
-                val = 13;
-                break;
-            case 'e':
-            case 'E':
-                val = 14;
-                break;
-            case 'f':
-            case 'F':
-                val = 15;
-                break;
+            val = c - '0';
         }
-
-        rv = rv | (val << shift);
-        index--;
-        shift += 4;
+        else if (c >= 'A' && c <= 'F')
+        {
+            val = (c - 'A' + 10);
+        }
+        else if (c >= 'a' && c <= 'f')
+        {
+            val = (c - 'a' + 10);
+        }
+        else
+        {
+            break; // Unrecognised character
+        }
+        rv = (rv << 4) | val;
+        ++str;
     }
 
     return rv;

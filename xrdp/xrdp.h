@@ -141,8 +141,6 @@ xrdp_wm_send_bitmap(struct xrdp_wm *self, struct xrdp_bitmap *bitmap,
                     int x, int y, int cx, int cy);
 int
 xrdp_wm_set_pointer(struct xrdp_wm *self, int cache_idx);
-unsigned int
-xrdp_wm_htoi (const char *ptr);
 int
 xrdp_wm_set_focused(struct xrdp_wm *self, struct xrdp_bitmap *wnd);
 int
