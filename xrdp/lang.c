@@ -700,9 +700,12 @@ xrdp_init_xkb_layout(struct xrdp_client_info *client_info)
 
         if (section_found == -1)
         {
-            g_memset(section_rdp_layouts, 0, sizeof(char) * 256);
-            g_memset(section_layouts_map, 0, sizeof(char) * 256);
             // read default section
+            strlcpy(section_rdp_layouts, "default_rdp_layouts",
+                    sizeof(section_rdp_layouts));
+            strlcpy(section_layouts_map, "default_layouts_map",
+                    sizeof(section_layouts_map));
+
             file_read_section(fd, "default", items, values);
             for (index = 0; index < items->count; index++)
             {
