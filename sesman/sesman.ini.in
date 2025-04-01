@@ -112,6 +112,10 @@ IdleTimeLimit=0
 ;   the string
 Policy=Default
 
+;; Startup wait time
+; Milliseconds to wait to ensure the session has started
+StartupWaitTime=1500
+
 [Logging]
 ; Note: Log levels can be any of: core, error, warning, info, debug, or trace
 LogFile=xrdp-sesman.log

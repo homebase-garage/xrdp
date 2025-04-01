@@ -81,6 +81,7 @@
 #define SESMAN_CFG_SESS_DISC_LIMIT   "DisconnectedTimeLimit"
 #define SESMAN_CFG_SESS_X11DISPLAYOFFSET "X11DisplayOffset"
 #define SESMAN_CFG_SESS_MAX_DISPLAY  "MaxDisplayNumber"
+#define SESMAN_CFG_SESS_STARTUP_WAIT_TIME "StartupWaitTime"
 
 #define SESMAN_CFG_SESS_POLICY_S "Policy"
 #define SESMAN_CFG_SESS_POLICY_DFLT_S "Default"
@@ -428,6 +429,7 @@ config_read_sessions(int file, struct config_sessions *se, struct list *param_n,
     se->max_disc_time = 0;
     se->kill_disconnected = 0;
     se->policy = SESMAN_CFG_SESS_POLICY_DEFAULT;
+    se->startup_wait_time = 1500;
 
     file_read_section(file, SESMAN_CFG_SESSIONS, param_n, param_v);
 
@@ -481,6 +483,20 @@ config_read_sessions(int file, struct config_sessions *se, struct list *param_n,
         else if (0 == g_strcasecmp(buf, SESMAN_CFG_SESS_POLICY_S))
         {
             se->policy = parse_policy_string(value);
+        }
+
+        else if (0 == g_strcasecmp(buf, SESMAN_CFG_SESS_STARTUP_WAIT_TIME))
+        {
+            int startup_wait_time = g_atoi(value);
+            if (startup_wait_time > 0 && startup_wait_time <= 15 * 1000)
+            {
+                se->startup_wait_time = startup_wait_time;
+            }
+            else
+            {
+                LOG(LOG_LEVEL_WARNING,
+                    "Ignoring bad " SESMAN_CFG_SESS_STARTUP_WAIT_TIME " value");
+            }
         }
     }
 
@@ -673,6 +689,7 @@ config_dump(struct config_sesman *config)
     g_writeln("    IdleTimeLimit:            %d", se->max_idle_time);
     g_writeln("    DisconnectedTimeLimit:    %d", se->max_disc_time);
     g_writeln("    Policy:                   %s", policy_s);
+    g_writeln("    StartupWaitTime:          %u", se->startup_wait_time);
 
     /* Security configuration */
     g_writeln("Security configuration:");
