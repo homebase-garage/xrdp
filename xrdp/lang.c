@@ -497,20 +497,48 @@ km_load_file(const char *filename, struct xrdp_keymap *keymap)
 }
 
 /*****************************************************************************/
+/***
+ * looks up a keylayout in a list of values
+ *
+ * @param keylayout (e.g. 000000409)
+ * @param items List of items (one of which is returned)
+ * @param values List of hexadecimal lookup values
+ * @param rdp_layout Buffer for result
+ * @param rdp_layout_len Size of rdp_layout
+ * @return != 0 for a successful lookup
+ */
+static int
+lookup_keylayout(int keylayout,
+                 const struct list *items,
+                 const struct list *values,
+                 char rdp_layout[], unsigned int rdp_layout_len)
+{
+    int index;
+    for (index = 0; index < items->count; index++)
+    {
+        const char *item = (const char *)list_get_item(items, index);
+        const char *value = (const char *)list_get_item(values, index);
+        if (g_atoix(value) == keylayout)
+        {
+            strlcpy(rdp_layout, item, rdp_layout_len);
+            return 1;
+        }
+    }
+    return 0;
+}
+/*****************************************************************************/
 void
 xrdp_init_xkb_layout(struct xrdp_client_info *client_info)
 {
     int fd;
     int index = 0;
-    int bytes;
-    struct list *names = (struct list *)NULL;
-    struct list *items = (struct list *)NULL;
-    struct list *values = (struct list *)NULL;
-    char *item = (char *)NULL;
-    char *value = (char *)NULL;
-    char *q = (char *)NULL;
-    char keyboard_cfg_file[256] = { 0 };
-    char rdp_layout[256] = { 0 };
+    struct list *names = NULL;
+    struct list *items = NULL;
+    struct list *values = NULL;
+    const char *item = NULL;
+    const char *value = NULL;
+    const char *q = NULL;
+    const char *keyboard_cfg_file = XRDP_CFG_PATH "/xrdp_keyboard.ini";
 
     const struct xrdp_keyboard_overrides *ko =
             &client_info->xrdp_keyboard_overrides;
@@ -542,14 +570,13 @@ xrdp_init_xkb_layout(struct xrdp_client_info *client_info)
     }
     /* infer model/variant */
     /* TODO specify different X11 keyboard models/variants */
-    g_memset(client_info->model, 0, sizeof(client_info->model));
-    g_memset(client_info->variant, 0, sizeof(client_info->variant));
-    g_strncpy(client_info->layout, "us", sizeof(client_info->layout) - 1);
+    client_info->model[0] = '\0';
+    client_info->variant[0] = '\0';
+    strlcpy(client_info->layout, "us", sizeof(client_info->layout));
     if (client_info->keyboard_subtype == 3)
     {
         /* macintosh keyboard */
-        bytes = sizeof(client_info->variant);
-        g_strncpy(client_info->variant, "mac", bytes - 1);
+        strlcpy(client_info->variant, "mac", sizeof(client_info->variant));
     }
     else if (client_info->keyboard_subtype == 0)
     {
@@ -557,7 +584,6 @@ xrdp_init_xkb_layout(struct xrdp_client_info *client_info)
         client_info->keyboard_subtype = 1;
     }
 
-    g_snprintf(keyboard_cfg_file, 255, "%s/xrdp_keyboard.ini", XRDP_CFG_PATH);
     LOG(LOG_LEVEL_DEBUG, "keyboard_cfg_file %s", keyboard_cfg_file);
 
     fd = g_file_open_ro(keyboard_cfg_file);
@@ -565,8 +591,13 @@ xrdp_init_xkb_layout(struct xrdp_client_info *client_info)
     if (fd >= 0)
     {
         int section_found = -1;
-        char section_rdp_layouts[256] = { 0 };
-        char section_layouts_map[256] = { 0 };
+        char section_rdp_layouts[256];
+        char section_layouts_map[256];
+        char rdp_layout[256];
+
+        section_rdp_layouts[0] = '\0';
+        section_layouts_map[0] = '\0';
+        rdp_layout[0] = '\0';
 
         names = list_create();
         names->auto_free = 1;
@@ -578,8 +609,8 @@ xrdp_init_xkb_layout(struct xrdp_client_info *client_info)
         file_read_sections(fd, names);
         for (index = 0; index < names->count; index++)
         {
-            q = (char *)list_get_item(names, index);
-            if (g_strncasecmp("default", q, 8) != 0)
+            q = (const char *)list_get_item(names, index);
+            if (g_strcasecmp("default", q) != 0)
             {
                 int i;
 
@@ -587,8 +618,8 @@ xrdp_init_xkb_layout(struct xrdp_client_info *client_info)
 
                 for (i = 0; i < items->count; i++)
                 {
-                    item = (char *)list_get_item(items, i);
-                    value = (char *)list_get_item(values, i);
+                    item = (const char *)list_get_item(items, i);
+                    value = (const char *)list_get_item(values, i);
                     LOG(LOG_LEVEL_DEBUG, "xrdp_init_xkb_layout: item %s value %s",
                         item, value);
                     if (g_strcasecmp(item, "keyboard_type") == 0)
@@ -613,41 +644,40 @@ xrdp_init_xkb_layout(struct xrdp_client_info *client_info)
                     {
                         if (section_found != -1 && section_found == index)
                         {
-                            g_strncpy(section_rdp_layouts, value, 255);
+                            strlcpy(section_rdp_layouts, value,
+                                    sizeof(section_rdp_layouts));
                         }
                     }
                     else if (g_strcasecmp(item, "layouts_map") == 0)
                     {
                         if (section_found != -1 && section_found == index)
                         {
-                            g_strncpy(section_layouts_map, value, 255);
+                            strlcpy(section_layouts_map, value,
+                                    sizeof(section_layouts_map));
                         }
                     }
                     else if (g_strcasecmp(item, "model") == 0)
                     {
                         if (section_found != -1 && section_found == index)
                         {
-                            bytes = sizeof(client_info->model);
-                            g_memset(client_info->model, 0, bytes);
-                            g_strncpy(client_info->model, value, bytes - 1);
+                            strlcpy(client_info->model, value,
+                                    sizeof(client_info->model));
                         }
                     }
                     else if (g_strcasecmp(item, "variant") == 0)
                     {
                         if (section_found != -1 && section_found == index)
                         {
-                            bytes = sizeof(client_info->variant);
-                            g_memset(client_info->variant, 0, bytes);
-                            g_strncpy(client_info->variant, value, bytes - 1);
+                            strlcpy(client_info->variant, value,
+                                    sizeof(client_info->variant));
                         }
                     }
                     else if (g_strcasecmp(item, "options") == 0)
                     {
                         if (section_found != -1 && section_found == index)
                         {
-                            bytes = sizeof(client_info->options);
-                            g_memset(client_info->options, 0, bytes);
-                            g_strncpy(client_info->options, value, bytes - 1);
+                            strlcpy(client_info->options, value,
+                                    sizeof(client_info->options));
                         }
                     }
                     else
@@ -670,21 +700,26 @@ xrdp_init_xkb_layout(struct xrdp_client_info *client_info)
 
         if (section_found == -1)
         {
-            g_memset(section_rdp_layouts, 0, sizeof(char) * 256);
-            g_memset(section_layouts_map, 0, sizeof(char) * 256);
             // read default section
+            strlcpy(section_rdp_layouts, "default_rdp_layouts",
+                    sizeof(section_rdp_layouts));
+            strlcpy(section_layouts_map, "default_layouts_map",
+                    sizeof(section_layouts_map));
+
             file_read_section(fd, "default", items, values);
             for (index = 0; index < items->count; index++)
             {
-                item = (char *)list_get_item(items, index);
-                value = (char *)list_get_item(values, index);
+                item = (const char *)list_get_item(items, index);
+                value = (const char *)list_get_item(values, index);
                 if (g_strcasecmp(item, "rdp_layouts") == 0)
                 {
-                    g_strncpy(section_rdp_layouts, value, 255);
+                    strlcpy(section_rdp_layouts, value,
+                            sizeof(section_rdp_layouts));
                 }
                 else if (g_strcasecmp(item, "layouts_map") == 0)
                 {
-                    g_strncpy(section_layouts_map, value, 255);
+                    strlcpy(section_layouts_map, value,
+                            sizeof(section_layouts_map));
                 }
             }
             list_clear(items);
@@ -693,53 +728,44 @@ xrdp_init_xkb_layout(struct xrdp_client_info *client_info)
 
         /* load the map */
         file_read_section(fd, section_rdp_layouts, items, values);
-        for (index = 0; index < items->count; index++)
+        if (!lookup_keylayout(client_info->keylayout, items, values,
+                              rdp_layout, sizeof(rdp_layout)))
         {
-            int rdp_layout_id;
-            item = (char *)list_get_item(items, index);
-            value = (char *)list_get_item(values, index);
-            rdp_layout_id = g_atoix(value);
-            if (rdp_layout_id == client_info->keylayout)
+            if ((client_info->keylayout & ~0xffff) != 0)
             {
-                g_strncpy(rdp_layout, item, 255);
-                break;
-            }
-        }
-        if (rdp_layout[0] == '\0' && (client_info->keylayout & ~0xffff) != 0)
-        {
-            // We failed to match the layout, but we may be able
-            // to match on the lower 16-bits
-            int alt_layout = client_info->keylayout & 0xffff;
-            for (index = 0; index < items->count; index++)
-            {
-                item = (char *)list_get_item(items, index);
-                value = (char *)list_get_item(values, index);
-                int rdp_layout_id = g_atoix(value);
-                if (rdp_layout_id == alt_layout)
+                // We failed to match the layout, but we may be able
+                // to match on the lower 16-bits
+                int alt_layout = client_info->keylayout & 0xffff;
+                if (lookup_keylayout(alt_layout, items, values,
+                                     rdp_layout, sizeof(rdp_layout)))
                 {
-                    g_strncpy(rdp_layout, item, 255);
                     LOG(LOG_LEVEL_INFO,
                         "Failed to match layout 0x%08X, but matched 0x%04X to %s",
                         client_info->keylayout, alt_layout, rdp_layout);
-                    break;
                 }
             }
         }
         list_clear(items);
         list_clear(values);
-        file_read_section(fd, section_layouts_map, items, values);
-        for (index = 0; index < items->count; index++)
+
+        // If we found a layout in the rdp layouts section, copy the
+        // corresponding X11 layout name to the client layout, e.g. if we
+        // matched 0xe0200411 to 'rdp_layout_jp, copy 'jp' for the client.
+        if (rdp_layout[0] != '\0')
         {
-            item = (char *)list_get_item(items, index);
-            value = (char *)list_get_item(values, index);
-            if (g_strcasecmp(item, rdp_layout) == 0)
+            file_read_section(fd, section_layouts_map, items, values);
+            for (index = 0; index < items->count; index++)
             {
-                bytes = sizeof(client_info->layout);
-                g_strncpy(client_info->layout, value, bytes - 1);
-                break;
+                item = (const char *)list_get_item(items, index);
+                value = (const char *)list_get_item(values, index);
+                if (g_strcasecmp(item, rdp_layout) == 0)
+                {
+                    strlcpy(client_info->layout, value,
+                            sizeof(client_info->layout));
+                    break;
+                }
             }
         }
-
         list_delete(names);
         list_delete(items);
         list_delete(values);
@@ -756,8 +782,8 @@ xrdp_init_xkb_layout(struct xrdp_client_info *client_info)
     }
 
     // Initialise the rules and a few keycodes for xorgxrdp
-    snprintf(client_info->xkb_rules, sizeof(client_info->xkb_rules),
-             "%s", scancode_get_xkb_rules());
+    strlcpy(client_info->xkb_rules, scancode_get_xkb_rules(),
+            sizeof(client_info->xkb_rules));
     if (keylayout_supports_caps_lock(client_info->keylayout))
     {
         client_info->x11_keycode_caps_lock =
