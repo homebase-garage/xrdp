@@ -2751,7 +2751,7 @@ xrdp_mm_get_sesman_port(char *port, int port_bytes)
 
     g_memset(cfg_file, 0, sizeof(char) * 256);
     /* default to port 3350 */
-    g_strncpy(port, "3350", port_bytes - 1);
+    strlcpy(port, "3350", port_bytes);
     /* see if port is in sesman.ini file */
     g_snprintf(cfg_file, 255, "%s/sesman.ini", XRDP_CFG_PATH);
     fd = g_file_open_ro(cfg_file);
@@ -2778,7 +2778,7 @@ xrdp_mm_get_sesman_port(char *port, int port_bytes)
 
                         if ((error > 0) && (error < 65000))
                         {
-                            g_strncpy(port, val, port_bytes - 1);
+                            strlcpy(port, val, port_bytes);
                         }
 
                         break;
@@ -3048,7 +3048,13 @@ parse_chansrvport(const char *value, char *dest, int dest_size, int uid)
     int rv = 0;
     int dnum = 0;
 
-    if (g_strncmp(value, "DISPLAY(", 8) == 0)
+    if (value == NULL)
+    {
+        LOG(LOG_LEVEL_WARNING,
+            "unexpectedly empty chansrvport string encountered");
+        rv = -1;
+    }
+    else if (g_strncmp(value, "DISPLAY(", 8) == 0)
     {
         const char *p = value + 8;
         const char *end = p;
@@ -3103,7 +3109,7 @@ parse_chansrvport(const char *value, char *dest, int dest_size, int uid)
     }
     else
     {
-        g_strncpy(dest, value, dest_size - 1);
+        strlcpy(dest, value, dest_size);
     }
 
     return rv;
@@ -3354,11 +3360,16 @@ xrdp_mm_connect_sm(struct xrdp_mm *self)
 
                     gw_username = xrdp_mm_get_value(self, "pamusername");
                     gw_password = xrdp_mm_get_value(self, "pampassword");
-                    if (!g_strcmp(gw_username, "same"))
+                    // gw_username shouldn't be NULL here, but we'll
+                    // check it anyway before dereferencing.
+                    if (gw_username != NULL &&
+                            !g_strcmp(gw_username, "same"))
                     {
                         gw_username = xrdp_mm_get_value(self, "username");
                     }
 
+                    // Default the password to the usual one if the
+                    // user hasn't specified one, or specified 'same'
                     if (gw_password == NULL ||
                             !g_strcmp(gw_password, "same"))
                     {
@@ -3475,7 +3486,6 @@ xrdp_mm_connect_sm(struct xrdp_mm *self)
                 if (self->use_chansrv)
                 {
                     char portbuff[XRDP_SOCKETS_MAXPATH];
-
                     if (self->use_sesman)
                     {
                         g_snprintf(portbuff, sizeof(portbuff),
@@ -3486,16 +3496,25 @@ xrdp_mm_connect_sm(struct xrdp_mm *self)
                     else
                     {
                         const char *cp = xrdp_mm_get_value(self, "chansrvport");
-                        portbuff[0] = '\0';
-                        parse_chansrvport(cp, portbuff, sizeof(portbuff),
-                                          self->uid);
-
-                        xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO,
-                                        "Connecting to chansrv on %s",
-                                        portbuff);
+                        if (parse_chansrvport(cp, portbuff, sizeof(portbuff),
+                                              self->uid) == 0)
+                        {
+                            xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO,
+                                            "Connecting to chansrv on %s",
+                                            portbuff);
+                        }
+                        else
+                        {
+                            // An error has already been logged
+                            portbuff[0] = '\0';
+                        }
                     }
-                    xrdp_mm_update_allowed_channels(self);
-                    xrdp_mm_chansrv_connect(self, portbuff);
+
+                    if (portbuff[0] != '\0')
+                    {
+                        xrdp_mm_update_allowed_channels(self);
+                        xrdp_mm_chansrv_connect(self, portbuff);
+                    }
                 }
             }
             break;
