@@ -367,19 +367,15 @@ scancode_to_index(unsigned short scancode)
 unsigned short
 scancode_from_index(int index)
 {
-    index &= 0xff;
-    unsigned short result;
-    if (index == SCANCODE_INDEX_PAUSE_KEY)
+    unsigned short result = index & 0xff;
+
+    if (result == SCANCODE_INDEX_PAUSE_KEY)
     {
         result = SCANCODE_PAUSE_KEY;
     }
-    else if (index < 0x80)
+    else if ((result & 0x80) != 0)
     {
-        result = index;
-    }
-    else
-    {
-        result = (index & 0x7f) | 0x100;
+        result ^= 0x180; // Clear bit 7, set bit 8
     }
     return result;
 }
