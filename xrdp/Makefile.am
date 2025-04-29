@@ -113,7 +113,7 @@ SUFFIXES = .in
 
 dist_xrdpsysconf_DATA = \
   gfx.toml \
-  xrdp_keyboard.ini
+  xrdp_keyboard.toml
 
 nodist_xrdpsysconf_DATA = \
   xrdp.ini
