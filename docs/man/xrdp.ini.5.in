@@ -62,10 +62,10 @@ See section \fBCHANNELS\fP below for more fine grained options.
 .TP
 \fBcrypt_level\fP=\fI[low|medium|high|fips]\fP
 .\" <http://blogs.msdn.com/b/openspecification/archive/2011/12/08/encryption-negotiation-in-rdp-connection.aspx>
-Regulate encryption level of Standard RDP Security.
+Regulate encryption level of Classic RDP Security.
 This parameter is effective only if \fBsecurity_layer\fP is set to \fBrdp\fP or \fBnegotiate\fP.
 
-Encryption in Standard RDP Security is controlled by two settings: \fIEncryption Level\fP
+Encryption in Classic RDP Security is controlled by two settings: \fIEncryption Level\fP
 and \fIEncryption Method\fP.  The only supported \fIEncryption Method\fP are \fB40BIT_ENCRYPTION\fP
 and \fB128BIT_ENCRYPTION\fP. \fB56BIT_ENCRYPTION\fP is not supported.
 This option controls the \fIEncryption Level\fP:
@@ -86,7 +86,8 @@ the server's maximum key strength (sever compatible).
 .TP
 .B fips
 All data sent between the client and server is protected using Federal Information
-Processing Standard 140-1 validated encryption methods.
+Processing Standard 140-1 validated encryption methods. Note that FIPS 140-1 is
+no longer considered secure.
 .I This level is required for Windows clients (mstsc.exe) if the client's group policy
 .I enforces FIPS-compliance mode.
 .RE
@@ -174,8 +175,9 @@ verification, and server authentication) are implemented by TLS.
 
 .TP
 .B rdp
-Standard RDP Security, which is not safe from man-in-the-middle attack, is used. The encryption level
-of Standard RDP Security is controlled by \fBcrypt_level\fP.
+Classic RDP Security is used. The encryption level
+of Classic RDP Security is controlled by \fBcrypt_level\fP.
+Use this setting for testing only.
 
 .TP
 .B negotiate

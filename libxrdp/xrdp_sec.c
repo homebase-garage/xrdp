@@ -2276,6 +2276,15 @@ xrdp_sec_incoming(struct xrdp_sec *self)
     else
     {
         /* init rdp security */
+        if (g_fips_mode_enabled())
+        {
+            /* We can't generate rsakeys.ini in FIPS mode. Nor should we
+             * try to use it */
+            LOG(LOG_LEVEL_ERROR, "xrdp_sec_incoming: "
+                "Classic RDP security unavailable in FIPS mode");
+            return 1;
+        }
+
         if (xrdp_sec_init_rdp_security(self) != 0)
         {
             LOG(LOG_LEVEL_ERROR, "xrdp_sec_incoming: xrdp_sec_init_rdp_security failed");
