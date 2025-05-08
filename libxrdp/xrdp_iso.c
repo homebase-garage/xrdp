@@ -72,6 +72,17 @@ xrdp_iso_create(struct xrdp_mcs *owner, struct trans *trans)
     self = (struct xrdp_iso *) g_malloc(sizeof(struct xrdp_iso), 1);
     self->mcs_layer = owner;
     self->trans = trans;
+
+    // See if we're running in vmconnect mode on this connection
+    struct xrdp_client_info *client_info = &(self->mcs_layer->sec_layer->rdp_layer->client_info);
+    if (client_info->vmconnect && trans->mode != TRANS_MODE_VSOCK)
+    {
+        char desc[MAX_PEER_DESCSTRLEN];
+        g_sck_get_peer_description(trans->sck, desc, sizeof(desc));
+        LOG(LOG_LEVEL_INFO, "Disabling vmconnect mode for connection from %s",
+            desc);
+        client_info->vmconnect = 0;
+    }
     return self;
 }
 
@@ -116,6 +127,11 @@ xrdp_iso_negotiate_security(struct xrdp_iso *self)
     {
         security_type_mask = PROTOCOL_SSL;
     }
+    /* But VMConnect mode supports everything. */
+    if (client_info->vmconnect)
+    {
+        security_type_mask |= PROTOCOL_HYBRID | PROTOCOL_HYBRID_EX;
+    }
 
     /* Logically 'and' this value with the mask requested by the client, and
      * see what's left */
@@ -124,12 +140,25 @@ xrdp_iso_negotiate_security(struct xrdp_iso *self)
         protostr);
     security_type_mask &= self->requestedProtocol;
 
-    /* Is there a match on SSL/TLS? */
-    if ((security_type_mask & PROTOCOL_SSL) != 0)
+    if (security_type_mask & PROTOCOL_HYBRID_EX)
     {
-        /* Can we do TLS? (basic check) */
-        if (g_file_readable(client_info->certificate) &&
-                g_file_readable(client_info->key_file))
+        /* Currently supported by VMConnect mode only */
+        LOG(LOG_LEVEL_INFO, "Selected HYBRID_EX security");
+        self->selectedProtocol = PROTOCOL_HYBRID_EX;
+        got_protocol = 1;
+    }
+    else if (security_type_mask & PROTOCOL_HYBRID)
+    {
+        /* Currently supported by VMConnect mode only */
+        LOG(LOG_LEVEL_INFO, "Selected HYBRID security");
+        self->selectedProtocol = PROTOCOL_HYBRID;
+        got_protocol = 1;
+    }
+    else if ((security_type_mask & PROTOCOL_SSL) != 0)
+    {
+        /* Can we do TLS? (basic check). VMConnect is exempt. */
+        if ((g_file_readable(client_info->certificate) &&
+                g_file_readable(client_info->key_file)) || client_info->vmconnect)
         {
             LOG(LOG_LEVEL_INFO, "Selected TLS security");
             self->selectedProtocol = PROTOCOL_SSL;
@@ -205,10 +234,17 @@ xrdp_iso_process_rdp_neg_req(struct xrdp_iso *self, struct stream *s)
     /* The type field has already been read to determine that this function
        should be called */
     in_uint8(s, flags); /* flags */
-    if (flags != 0x0 && flags != 0x8 && flags != 0x1)
+    if ((flags & 0x0000000b) != flags)
     {
         LOG(LOG_LEVEL_ERROR,
             "Unsupported [MS-RDPBCGR] RDP_NEG_REQ flags: 0x%2.2x", flags);
+        return 1;
+    }
+
+    /* If both flags are set, it means 'OR', so fail only if only the one is set. */
+    if ((flags & REDIRECTED_AUTHENTICATION_MODE_REQUIRED) && !(flags & RESTRICTED_ADMIN_MODE_REQUIRED))
+    {
+        LOG(LOG_LEVEL_ERROR, "[MS-RDPBCGR] RDP_NEG_REQ: RemoteGuard isn't supported !");
         return 1;
     }
 
@@ -374,8 +410,11 @@ xrdp_iso_send_cc(struct xrdp_iso *self)
     char *holdp;
     char *len_ptr;
     char *len_indicator_ptr;
+    char flags;
     int len;
     int len_indicator;
+
+    struct xrdp_client_info *client_info = &(self->mcs_layer->sec_layer->rdp_layer->client_info);
 
     make_stream(s);
     init_stream(s, 8192);
@@ -410,10 +449,17 @@ xrdp_iso_send_cc(struct xrdp_iso *self)
         }
         else
         {
+            flags = EXTENDED_CLIENT_DATA_SUPPORTED;
+
+            if (client_info->vmconnect)
+            {
+                /* NLA is handled by the host and not us. */
+                flags |= RESTRICTED_ADMIN_MODE_SUPPORTED;
+            }
+
             /* [MS-RDPBCGR] RDP_NEG_RSP */
             out_uint8(s, RDP_NEG_RSP);                    /* type*/
-            //TODO: hardcoded flags
-            out_uint8(s, EXTENDED_CLIENT_DATA_SUPPORTED); /* flags */
+            out_uint8(s, flags);                          /* flags */
             out_uint16_le(s, 8);                          /* length (must be 8) */
             out_uint32_le(s, self->selectedProtocol);     /* selectedProtocol */
             LOG_DEVEL(LOG_LEVEL_TRACE, "Adding structure [MS-RDPBCGR] RDP_NEG_RSP "
