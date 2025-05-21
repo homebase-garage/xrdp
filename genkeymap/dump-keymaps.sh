@@ -86,6 +86,9 @@ kbgen 0415 "pl-PL"        "$os" -model pc104 -layout pl
 kbgen 0416 "pt-BR"        "$os" -model pc105 -layout br
 kbgen 0419 "ru-RU"        "$os" -model pc104 -layout ru
 kbgen 041d "sv-SE"        "$os" -model pc104 -layout se
+kbgen 0426 "lv-LV"        "$os" -model pc104 -layout lv -variant ergonomic
+kbgen 10426 "lv-LV"       "$os" -model pc104 -layout lv
+# 20426 Latvian(Standard) is symlinked to 10426 Latvian(QWERTY) elsewhere
 kbgen 0807 "de-CH"        "$os" -model pc105 -layout ch
 kbgen 0809 "en-GB"        "$os" -model pc105 -layout gb
 kbgen 080a "es-MX"        "$os" -model pc105 -layout latam
