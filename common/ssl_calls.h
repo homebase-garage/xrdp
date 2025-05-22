@@ -90,7 +90,8 @@ struct ssl_tls *
 ssl_tls_create(struct trans *trans, const char *key, const char *cert);
 int
 ssl_tls_accept(struct ssl_tls *self, long ssl_protocols,
-               const char *tls_ciphers);
+               const char *tls_ciphers,
+               int (*is_term)(void));
 int
 ssl_tls_disconnect(struct ssl_tls *self);
 void

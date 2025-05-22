@@ -674,6 +674,7 @@ xrdp_listen_init(struct xrdp_listen *self)
         }
         ltrans->trans_conn_in = xrdp_listen_conn_in;
         ltrans->callback_data = self;
+        ltrans->is_term = g_is_term;
         list_add_item(self->trans_list, (intptr_t) ltrans);
     }
     return 0;
