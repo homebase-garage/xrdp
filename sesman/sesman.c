@@ -39,7 +39,7 @@
 #include "eicp_process.h"
 #include "ercp.h"
 #include "ercp_process.h"
-#include "pre_session_list.h"
+#include "scp_list.h"
 #include "session_list.h"
 #include "lock_uds.h"
 #include "os_calls.h"
@@ -54,9 +54,9 @@
 #include "xrdp_sockets.h"
 
 /**
- * Maximum number of pre-session items
+ * Maximum number of SCP list items
  */
-#define MAX_PRE_SESSION_ITEMS 16
+#define MAX_SCP_LIST_ITEMS 16
 
 /**
  * Define the mode of operation of the program
@@ -218,7 +218,7 @@ sesman_close_all(void)
 {
     LOG_DEVEL(LOG_LEVEL_TRACE, "sesman_close_all:");
 
-    pre_session_list_cleanup();
+    scp_list_cleanup();
     session_list_cleanup();
 
     g_delete_wait_obj(g_reload_event);
@@ -241,10 +241,10 @@ sesman_scp_data_in(struct trans *self)
 
     if (rv == 0 && available)
     {
-        struct pre_session_item *psi;
-        psi = (struct pre_session_item *)self->callback_data;
+        struct scp_list_item *sli;
+        sli = (struct scp_list_item *)self->callback_data;
 
-        if ((rv = scp_process(psi)) != 0)
+        if ((rv = scp_process(sli)) != 0)
         {
             LOG(LOG_LEVEL_ERROR, "sesman_data_in: scp_process_msg failed");
         }
@@ -258,14 +258,14 @@ sesman_scp_data_in(struct trans *self)
 static int
 sesman_listen_conn_in(struct trans *self, struct trans *new_self)
 {
-    struct pre_session_item *psi;
-    if (pre_session_list_get_count() >= MAX_PRE_SESSION_ITEMS)
+    struct scp_list_item *sli;
+    if (scp_list_get_count() >= MAX_SCP_LIST_ITEMS)
     {
         LOG(LOG_LEVEL_ERROR, "sesman_listen_conn_in: error, too many "
             "connections, rejecting");
         trans_delete(new_self);
     }
-    else if ((psi = pre_session_list_new()) == NULL)
+    else if ((sli = scp_list_item_new()) == NULL)
     {
         LOG(LOG_LEVEL_ERROR, "sesman_data_in: No memory to allocate "
             "new connection");
@@ -278,9 +278,9 @@ sesman_listen_conn_in(struct trans *self, struct trans *new_self)
     }
     else
     {
-        new_self->callback_data = (void *)psi;
+        new_self->callback_data = (void *)sli;
         new_self->trans_data_in = sesman_scp_data_in;
-        psi->client_trans = new_self;
+        sli->client_trans = new_self;
     }
 
     return 0;
@@ -297,9 +297,9 @@ sesman_eicp_data_in(struct trans *self)
 
     if (rv == 0 && available)
     {
-        struct pre_session_item *psi;
-        psi = (struct pre_session_item *)self->callback_data;
-        if ((rv = eicp_process(psi)) != 0)
+        struct scp_list_item *sli;
+        sli = (struct scp_list_item *)self->callback_data;
+        if ((rv = eicp_process(sli)) != 0)
         {
             LOG(LOG_LEVEL_ERROR, "sesman_eicp_data_in: eicp_process_msg failed");
         }
@@ -499,11 +499,11 @@ sesman_main_loop(void)
             }
         }
 
-        error = pre_session_list_get_wait_objs(robjs, &robjs_count);
+        error = scp_list_get_wait_objs(robjs, &robjs_count);
         if (error != 0)
         {
             LOG(LOG_LEVEL_ERROR, "sesman_main_loop: "
-                "pre_session_list_get_wait_objs failed");
+                "scp_list_get_wait_objs failed");
             break;
         }
 
@@ -557,11 +557,11 @@ sesman_main_loop(void)
             }
         }
 
-        error = pre_session_list_check_wait_objs();
+        error = scp_list_check_wait_objs();
         if (error != 0)
         {
             LOG(LOG_LEVEL_ERROR, "sesman_main_loop: "
-                "pre_session_list_check_wait_objs failed");
+                "scp_list_check_wait_objs failed");
             break;
         }
 
@@ -945,7 +945,7 @@ main(int argc, char **argv)
         }
     }
 
-    if ((error = pre_session_list_init(MAX_PRE_SESSION_ITEMS)) == 0 &&
+    if ((error = scp_list_init(MAX_SCP_LIST_ITEMS)) == 0 &&
             (error = session_list_init()) == 0 &&
             (error = sesman_restart_discover_sessions()) == 0)
     {

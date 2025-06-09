@@ -31,19 +31,19 @@
 #include <sys/types.h>
 
 struct trans;
-struct pre_session_item;
+struct scp_list_item;
 
 /**
  * Start a session executive
- * @param psi Pre-session item to allocate EICP transport to
+ * @param sli SCP list item to allocate EICP transport to
  * @result 0 for success
  *
  * If non-zero is returned, all errors have been logged.
  * If zero is returned, the sesexec_trans and sesexec_pid fields of
- * the pre-session-item have been initialised.
+ * the SCP_list_item have been initialised.
  */
 
 int
-sesexec_start(struct pre_session_item *psi);
+sesexec_start(struct scp_list_item *sli);
 
 #endif // SESEXEC_H

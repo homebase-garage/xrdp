@@ -32,7 +32,7 @@
 #include "eicp.h"
 #include "log.h"
 #include "os_calls.h"
-#include "pre_session_list.h"
+#include "scp_list.h"
 #include "string_calls.h"
 #include "sesexec_control.h"
 #include "sesman.h"
@@ -104,7 +104,7 @@ create_exec_args(void)
 
 /*****************************************************************************/
 int
-sesexec_start(struct pre_session_item *psi)
+sesexec_start(struct scp_list_item *sli)
 {
     // Local socket pair used to set up the EICP channel for sesexec
     // We also use the socket pair to communicate the PID of sesexec back
@@ -214,9 +214,9 @@ sesexec_start(struct pre_session_item *psi)
                 else
                 {
                     t->trans_data_in = sesman_eicp_data_in;
-                    t->callback_data = (void *)psi;
-                    psi->sesexec_trans = t;
-                    psi->sesexec_pid = pid;
+                    t->callback_data = (void *)sli;
+                    sli->sesexec_trans = t;
+                    sli->sesexec_pid = pid;
                     rv = 0;
                 }
             }

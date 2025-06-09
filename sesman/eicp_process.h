@@ -27,15 +27,15 @@
 #ifndef EICP_PROCESS_H
 #define EICP_PROCESS_H
 
-struct pre_session_item;
+struct scp_list_item;
 
 /**
  *
  * @brief Processes an EICP message
- * @param sc the sesman connection
+ * @param sli the sesman connection
  *
  */
 int
-eicp_process(struct pre_session_item *psi);
+eicp_process(struct scp_list_item *sli);
 
 #endif
