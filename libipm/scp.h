@@ -56,6 +56,9 @@ enum scp_msg_code
     E_SCP_CREATE_SESSION_REQUEST,
     E_SCP_CREATE_SESSION_RESPONSE,
 
+    E_SCP_CONNECT_SESSION_REQUEST,
+    E_SCP_CONNECT_SESSION_RESPONSE,
+
     E_SCP_LIST_SESSIONS_REQUEST,
     E_SCP_LIST_SESSIONS_RESPONSE,
 
@@ -412,6 +415,68 @@ scp_get_create_session_response(struct trans *trans,
                                 enum scp_screate_status *status,
                                 int *display,
                                 struct guid *guid);
+
+/**
+ * Send an E_SCP_CONNECT_SESSION_REQUEST (SCP client)
+ *
+ * @param trans SCP transport
+ * @param guid Session guid
+ * @param flags Flags which affect the returned FDs
+ * @return != 0 for error
+ *
+ * Server replies with E_SCP_CONNECT_SESSION_RESPONSE
+ */
+int
+scp_send_connect_session_request(struct trans *trans,
+                                 const struct guid *guid,
+                                 unsigned int flags);
+
+
+/**
+ * Parse an incoming E_SCP_CONNECT_SESSION_REQUEST (SCP server)
+ *
+ * @param trans SCP transport
+ * @param[out] guid Session guid
+ * @param[out] flags Flags which affect the returned FDs
+ * @return != 0 for error
+ */
+int
+scp_get_connect_session_request(struct trans *trans,
+                                struct guid *guid,
+                                unsigned int *flags);
+
+/**
+ * Send an E_SCP_CONNECT_SESSION_RESPONSE (SCP server)
+ *
+ * @param trans SCP transport
+ * @param status Status of connection request
+ * @param display_fd File descriptor for display server
+ * @param chan_fd File descriptor for chansrv, or -1 for no chansrv
+ *
+ * @return != 0 for error
+ */
+int
+scp_send_connect_session_response(struct trans *trans,
+                                  enum scp_sconnect_status status,
+                                  int display_fd,
+                                  int chan_fd);
+
+
+/**
+ * Parse an incoming E_SCP_CONNECT_SESSION_RESPONSE (SCP client)
+ *
+ * @param trans SCP transport
+ * @param[out] status Status of connection request
+ * @param[out] display_fd File descriptor for display server
+ * @param[out] chan_fd File descriptor for chansrv, or -1 for no chansrv
+ *
+ * @return != 0 for error
+ */
+int
+scp_get_connect_session_response(struct trans *trans,
+                                 enum scp_sconnect_status *status,
+                                 int *display_fd,
+                                 int *chan_fd);
 
 /**
  * Send an E_SCP_LIST_SESSIONS_REQUEST (SCP client)

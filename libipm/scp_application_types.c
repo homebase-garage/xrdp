@@ -85,3 +85,31 @@ scp_screate_status_to_str(enum scp_screate_status n,
 
     return buff;
 }
+
+/*****************************************************************************/
+const char *
+scp_sconnect_status_to_str(enum scp_sconnect_status n,
+                           char *buff, unsigned int buff_size)
+{
+    const char *str =
+        (n == E_SCP_SCONNECT_OK) ? "OK" :
+        (n == E_SCP_SCONNECT_NOT_LOGGED_IN) ? "Connection is not logged in" :
+        (n == E_SCP_SCONNECT_NO_SUCH_GUID) ? "No such session for this user" :
+        (n == E_SCP_SCONNECT_NO_MEMORY) ? "No memory for connection" :
+        (n == E_SCP_SCONNECT_SERVER_FAIL) ? "Can't connect to X server" :
+        (n == E_SCP_SCONNECT_GENERAL_ERROR) ? "General session connection error" :
+
+        /* Default */ NULL;
+
+    if (str == NULL)
+    {
+        g_snprintf(buff, buff_size, "[session connection error code #%d]",
+                   (int)n);
+    }
+    else
+    {
+        g_snprintf(buff, buff_size, "%s", str);
+    }
+
+    return buff;
+}
