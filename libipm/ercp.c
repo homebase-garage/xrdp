@@ -40,6 +40,8 @@ msgno_to_str(unsigned short n)
     return
         (n == E_ERCP_SESSION_ANNOUNCE_EVENT) ? "ERCP_SESSION_ANNOUNCE_EVENT" :
         (n == E_ERCP_SESSION_FINISHED_EVENT) ? "ERCP_SESSION_FINISHED_EVENT" :
+
+        (n == E_ERCP_SESSION_RECONNECT_EVENT) ? "ERCP_SESSION_RECONNECT_EVENT" :
         NULL;
 }
 

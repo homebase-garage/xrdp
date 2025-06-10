@@ -69,6 +69,7 @@ scp_screate_status_to_str(enum scp_screate_status n,
         (n == E_SCP_SCREATE_NO_DISPLAY) ? "No X displays are available" :
         (n == E_SCP_SCREATE_X_SERVER_FAIL) ? "X server could not be started" :
         (n == E_SCP_SCREATE_SESSION_FAIL) ? "Session failed immediately" :
+        (n == E_SCP_SCREATE_IN_PROGRESS) ? "Session creation is already in progress" :
         (n == E_SCP_SCREATE_GENERAL_ERROR) ? "General session creation error" :
         /* Default */ NULL;
 

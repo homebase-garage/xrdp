@@ -32,12 +32,15 @@
 
 #include "eicp.h"
 #include "eicp_process.h"
+#include "ercp.h"
 #include "os_calls.h"
 #include "scp_list.h"
+#include "session_list.h"
 #include "scp.h"
 #include "sesman.h"
 #include "sesman_access.h"
 #include "sesman_config.h"
+#include "guid.h"
 
 /******************************************************************************/
 
@@ -93,6 +96,61 @@ process_sys_login_response(struct scp_list_item *sli)
 }
 
 /******************************************************************************/
+static int
+process_create_session_response(struct scp_list_item *sli)
+{
+    struct session_item *s_item;
+    int display = -1;
+    struct guid guid;
+    enum scp_screate_status status;
+
+    int rv = eicp_get_create_session_response(sli->sesexec_trans,
+             &status, &guid);
+    if (rv == 0)
+    {
+        // Create an entry on the session list for the new session
+        if (status == E_SCP_SCREATE_OK &&
+                (s_item = session_list_new()) == NULL)
+        {
+            status = E_SCP_SCREATE_NO_MEMORY;
+        }
+
+        if (status == E_SCP_SCREATE_OK)
+        {
+            // Further comms from sesexec comes over the ERCP
+            // protocol
+            ercp_trans_from_eicp_trans(sli->sesexec_trans,
+                                       sesman_ercp_data_in,
+                                       (void *)s_item);
+
+            // Move the new ERCP transport over to the session list item,
+            // and initialise enough data so that a connection request
+            // can be serviced.
+            s_item->sesexec_trans = sli->sesexec_trans;
+            s_item->sesexec_pid = sli->sesexec_pid;
+            s_item->guid = guid;
+            s_item->uid = sli->uid;
+            s_item->display = sli->session_display;
+            display = s_item->display;
+
+            // We don't use the sesexec process again
+            sli->sesexec_trans = NULL;
+            sli->sesexec_pid = 0;
+        }
+        else
+        {
+            guid_clear(&guid);
+            display = -1;
+        }
+        rv = scp_send_create_session_response(sli->client_trans, status,
+                                              display, &guid);
+        sli->create_session_in_progress = 0;
+        sli->session_display = -1;
+    }
+
+    return rv;
+}
+/******************************************************************************/
 int
 eicp_process(struct scp_list_item *sli)
 {
@@ -103,6 +161,10 @@ eicp_process(struct scp_list_item *sli)
     {
         case E_EICP_SYS_LOGIN_RESPONSE:
             rv = process_sys_login_response(sli);
+            break;
+
+        case E_EICP_CREATE_SESSION_RESPONSE:
+            rv = process_create_session_response(sli);
             break;
 
         default:

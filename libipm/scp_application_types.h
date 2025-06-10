@@ -99,6 +99,7 @@ enum scp_screate_status
     E_SCP_SCREATE_NO_DISPLAY, ///< No X server display number is available
     E_SCP_SCREATE_X_SERVER_FAIL, ///< X server could not be started
     E_SCP_SCREATE_SESSION_FAIL, ///< The session failed quickly
+    E_SCP_SCREATE_IN_PROGRESS, ///< A create session request is in progress
     E_SCP_SCREATE_GENERAL_ERROR ///< An unspecific error has occurred
 };
 

@@ -32,6 +32,8 @@
 
 #include "xrdp_constants.h"
 
+struct set_int;
+
 /**
  * Type describing the login state of an SCP list item
  */
@@ -83,6 +85,8 @@ struct scp_list_item
     char *username; ///< Username from UID (at time of logon)
     char start_ip_addr[MAX_PEER_ADDRSTRLEN];
     int is_admin;
+    int create_session_in_progress; ///< Already handling a create_session
+    unsigned int session_display;  ///< Display allocated for create_session
 };
 
 
@@ -150,5 +154,13 @@ scp_list_get_wait_objs(tbus robjs[], int *robjs_count);
  */
 int
 scp_list_check_wait_objs(void);
+
+/**
+ * @brief Get all create-session displays
+ *
+ * Adds displays allocated to create-session operations to a set
+ */
+void
+scp_list_get_create_session_displays(struct set_int *alloc_displays);
 
 #endif // SCP_LIST_H

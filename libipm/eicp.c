@@ -44,6 +44,7 @@ msgno_to_str(unsigned short n)
         (n == E_EICP_LOGOUT_REQUEST) ? "EICP_LOGOUT_REQUEST" :
 
         (n == E_EICP_CREATE_SESSION_REQUEST) ? "EICP_CREATE_SESSION_REQUEST" :
+        (n == E_EICP_CREATE_SESSION_RESPONSE) ? "EICP_CREATE_SESSION_RESPONSE" :
 
         NULL;
 }
@@ -246,6 +247,23 @@ eicp_get_sys_login_response(struct trans *trans,
 
 /*****************************************************************************/
 int
+eicp_send_uds_login_request(struct trans *trans,
+                            int scp_fd)
+{
+    return libipm_msg_out_simple_send(
+               trans, (int)E_EICP_UDS_LOGIN_REQUEST, "h", scp_fd);
+}
+
+/*****************************************************************************/
+int
+eicp_get_uds_login_request(struct trans *trans,
+                           int *scp_fd)
+{
+    return libipm_msg_in_parse( trans, "h", scp_fd);
+}
+
+/*****************************************************************************/
+int
 eicp_send_logout_request(struct trans *trans)
 {
     return libipm_msg_out_simple_send(trans, (int)E_EICP_LOGOUT_REQUEST, NULL);
@@ -255,7 +273,6 @@ eicp_send_logout_request(struct trans *trans)
 
 int
 eicp_send_create_session_request(struct trans *trans,
-                                 int scp_fd,
                                  unsigned int display,
                                  enum scp_session_type type,
                                  unsigned short width,
@@ -267,8 +284,7 @@ eicp_send_create_session_request(struct trans *trans,
     return libipm_msg_out_simple_send(
                trans,
                (int)E_EICP_CREATE_SESSION_REQUEST,
-               "huyqqyss",
-               scp_fd,
+               "uyqqyss",
                display,
                type,
                width,
@@ -282,7 +298,6 @@ eicp_send_create_session_request(struct trans *trans,
 
 int
 eicp_get_create_session_request(struct trans *trans,
-                                int *scp_fd,
                                 unsigned int *display,
                                 enum scp_session_type *type,
                                 unsigned short *width,
@@ -300,8 +315,7 @@ eicp_get_create_session_request(struct trans *trans,
 
     int rv = libipm_msg_in_parse(
                  trans,
-                 "huyqqyss",
-                 scp_fd,
+                 "uyqqyss",
                  &i_display,
                  &i_type,
                  &i_width,
@@ -318,6 +332,43 @@ eicp_get_create_session_request(struct trans *trans,
         *height = i_height;
         /* bpp is fixed for Xorg session types */
         *bpp = (*type == SCP_SESSION_TYPE_XORG) ? 24 : i_bpp;
+    }
+
+    return rv;
+}
+/*****************************************************************************/
+
+int
+eicp_send_create_session_response(struct trans *trans,
+                                  enum scp_screate_status status,
+                                  const struct guid *guid)
+{
+    struct libipm_fsb guid_descriptor = { (void *)guid, sizeof(*guid) };
+    return libipm_msg_out_simple_send(
+               trans, (int)E_EICP_CREATE_SESSION_RESPONSE,
+               "iB", status, &guid_descriptor);
+}
+
+/*****************************************************************************/
+
+int
+eicp_get_create_session_response(struct trans *trans,
+                                 enum scp_screate_status *status,
+                                 struct guid *guid)
+{
+    /* Intermediate values */
+    int32_t i_status;
+
+    const struct libipm_fsb guid_descriptor = { (void *)guid, sizeof(*guid) };
+    int rv = libipm_msg_in_parse(
+                 trans,
+                 "iB",
+                 &i_status,
+                 &guid_descriptor);
+
+    if (rv == 0)
+    {
+        *status = (enum scp_screate_status)i_status;
     }
 
     return rv;

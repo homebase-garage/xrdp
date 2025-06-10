@@ -31,15 +31,16 @@
 #include "trans.h"
 #include "os_calls.h"
 #include "eicp.h"
-#include "ercp.h"
 #include "scp.h"
 
+#include "display_utils.h"
 #include "scp_process.h"
 #include "sesman.h"
 #include "sesman_access.h"
 #include "sesman_auth.h"
 #include "sesman_config.h"
 #include "os_calls.h"
+#include "set_int.h"
 #include "scp_list.h"
 #include "session_list.h"
 #include "sesexec_control.h"
@@ -390,12 +391,44 @@ create_xrdp_socket_path(uid_t uid)
 }
 
 /******************************************************************************/
+/*
+ * Gets a free display number
+ *
+ * We can't use displays either allocated to sessions, or being used to
+ * create sessions
+ */
+static int
+get_free_display(void)
+{
+    int result = -1;
+    struct set_int *alloc_displays;
+
+    alloc_displays = set_int_init(g_cfg->sess.x11_display_offset,
+                                  g_cfg->sess.max_display_number);
+
+    if (alloc_displays != NULL)
+    {
+        // Get all the displays either allocated to sessions, or
+        // potentially assigned to sessions on the SCP list
+        session_list_get_session_displays(alloc_displays);
+        scp_list_get_create_session_displays(alloc_displays);
+
+        // Find a free display, taking the allocated ones into account
+        result = display_utils_get_free_display(alloc_displays);
+
+        set_int_delete(alloc_displays);
+    }
+
+    return result;
+}
+
+/******************************************************************************/
 
 static int
 process_create_session_request(struct scp_list_item *sli)
 {
     int rv;
-    /* Client parameters describing new session*/
+    /* Client parameters describing new session */
     enum scp_session_type type;
     unsigned short width;
     unsigned short height;
@@ -404,8 +437,9 @@ process_create_session_request(struct scp_list_item *sli)
     const char *directory;
 
     struct guid guid;
-    int display = 0;
+    int display = -1;
     struct session_item *s_item = NULL;
+    int start_sesexec = (sli->sesexec_trans == NULL);
     int send_client_reply = 1;
 
     enum scp_screate_status status = E_SCP_SCREATE_OK;
@@ -420,6 +454,10 @@ process_create_session_request(struct scp_list_item *sli)
         {
             status = E_SCP_SCREATE_NOT_LOGGED_IN;
         }
+        else if (sli->create_session_in_progress)
+        {
+            status = E_SCP_SCREATE_IN_PROGRESS;
+        }
         else
         {
             LOG(LOG_LEVEL_INFO,
@@ -433,29 +471,6 @@ process_create_session_request(struct scp_list_item *sli)
                 // Found an existing session
                 display = s_item->display;
                 guid = s_item->guid;
-
-                // Tell the existing session to run the reconnect script.
-                // We ignore errors at this level, as any comms errors
-                // will be picked up in the main loop
-                (void)ercp_send_session_reconnect_event(s_item->sesexec_trans);
-
-                if (sli->start_ip_addr[0] != '\0')
-                {
-                    LOG( LOG_LEVEL_INFO, "++ reconnected session: username %s, "
-                         "display :%d.0, session_pid %d, ip %s",
-                         sli->username, display,
-                         s_item->sesexec_pid, sli->start_ip_addr);
-                }
-                else
-                {
-                    LOG(LOG_LEVEL_INFO, "++ reconnected session: username %s, "
-                        "display :%d.0, session_pid %d",
-                        sli->username, display, s_item->sesexec_pid);
-                }
-
-                // If we created an authentication process for this SCP
-                // connection, close it gracefully
-                logout_scp_list_item(sli);
             }
             // Need to create a new session
             else if (g_cfg->sess.max_sessions > 0 &&
@@ -463,14 +478,9 @@ process_create_session_request(struct scp_list_item *sli)
             {
                 status = E_SCP_SCREATE_MAX_REACHED;
             }
-            else if ((display = session_list_get_available_display()) < 0)
+            else if ((display = get_free_display()) < 0)
             {
                 status = E_SCP_SCREATE_NO_DISPLAY;
-            }
-            // Create an entry on the session list for the new session
-            else if ((s_item = session_list_new()) == NULL)
-            {
-                status = E_SCP_SCREATE_NO_MEMORY;
             }
             // Create a socket dir for this user
             else if (create_xrdp_socket_path(sli->uid) != 0)
@@ -478,11 +488,25 @@ process_create_session_request(struct scp_list_item *sli)
                 status = E_SCP_SCREATE_GENERAL_ERROR;
             }
             // Create a sesexec process if we don't have one (UDS login)
-            else if (sli->sesexec_trans == NULL && sesexec_start(sli) != 0)
+            else if (start_sesexec && sesexec_start(sli) != 0)
             {
                 LOG(LOG_LEVEL_ERROR,
                     "Can't start sesexec to manage session");
                 status = E_SCP_SCREATE_GENERAL_ERROR;
+            }
+            else if (start_sesexec &&
+                     eicp_send_uds_login_request(
+                         sli->sesexec_trans, sli->client_trans->sck) != 0)
+            {
+                // Because we started sesexec late, we needed to log it in.
+                // That hasn't gone too well.
+                LOG(LOG_LEVEL_ERROR,
+                    "Can't set UID for sesexec process");
+                status = E_SCP_SCREATE_GENERAL_ERROR;
+
+                // Looks like sesexec is broken...
+                trans_delete(sli->sesexec_trans);
+                sli->sesexec_trans = NULL;
             }
             else
             {
@@ -490,7 +514,6 @@ process_create_session_request(struct scp_list_item *sli)
                 int eicp_stat;
                 eicp_stat = eicp_send_create_session_request(
                                 sli->sesexec_trans,
-                                sli->client_trans->sck,
                                 display,
                                 type, width, height,
                                 bpp, shell, directory);
@@ -498,42 +521,29 @@ process_create_session_request(struct scp_list_item *sli)
                 if (eicp_stat != 0)
                 {
                     LOG(LOG_LEVEL_ERROR,
-                        "Can't ask sesexec to authenticate user");
+                        "Can't ask sesexec to create a session");
                     status = E_SCP_SCREATE_GENERAL_ERROR;
+                    // Looks like sesexec is broken...
+                    trans_delete(sli->sesexec_trans);
+                    sli->sesexec_trans = NULL;
                 }
                 else
                 {
-                    // We've handed over responsibility for the
-                    // SCP communication
+                    // We're not sending a reply yet
                     send_client_reply = 0;
-
-                    // Further comms from sesexec comes over the ERCP
-                    // protocol
-                    ercp_trans_from_eicp_trans(sli->sesexec_trans,
-                                               sesman_ercp_data_in,
-                                               (void *)s_item);
-
-                    // Move the transport over to the session list item
-                    s_item->sesexec_trans = sli->sesexec_trans;
-                    s_item->sesexec_pid = sli->sesexec_pid;
-                    sli->sesexec_trans = NULL;
-                    sli->sesexec_pid = 0;
-
-                    // Add the display to the session item so we don't try
-                    // to allocate it to another session
-                    s_item->display = display;
+                    sli->create_session_in_progress = 1;
+                    sli->session_display = display; // Reserve display
                 }
             }
         }
 
-        // Currently a create session request is the last thing on a
-        // connection, and results in automatic closure
-        //
-        // We may have passed the client_trans over to sesexec. If so,
-        // we can't send a reply here.
-        sli->dispatcher_action = E_SLD_TERMINATE_SCP_CONN;
         if (send_client_reply)
         {
+            if (status != E_SCP_SCREATE_OK)
+            {
+                display = -1;
+                guid_clear(&guid);
+            }
             rv = scp_send_create_session_response(sli->client_trans,
                                                   status, display, &guid);
         }

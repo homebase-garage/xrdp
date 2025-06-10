@@ -34,6 +34,8 @@
 #include "scp_application_types.h"
 #include "xrdp_constants.h"
 
+struct set_int;
+
 enum session_state
 {
     /**
@@ -116,13 +118,12 @@ struct session_item *
 session_list_new(void);
 
 /**
- * Get the next available display
+ * @brief Get all session displays
  *
- * The display isn't reserved until the caller has allocated a new session
- * (with session_list_new()) and put the new display in it.
+ * Adds displays allocated to sessions to a set
  */
-int
-session_list_get_available_display(void);
+void
+session_list_get_session_displays(struct set_int *alloc_displays);
 
 /**
  *

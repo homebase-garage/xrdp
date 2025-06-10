@@ -1086,20 +1086,23 @@ session_send_term(struct session_data *sd, int wait_for_all)
             g_sigterm(sd->win_mgr);
         }
 
-        while (session_active(sd))
+        if (wait_for_all)
         {
-            /* Don't check SIGTERM - we shouldn't be here long */
-            if (g_obj_wait(&g_sigchld_event, 1, NULL, 0, -1) != 0)
+            while (session_active(sd))
             {
-                /* should not get here */
-                LOG(LOG_LEVEL_WARNING, "session_send_term: "
-                    "Unexpected error from g_obj_wait()");
-                g_sleep(100);
-            }
-            else
-            {
-                g_reset_wait_obj(g_sigchld_event);
-                session_process_sigchld_event(sd);
+                /* Don't check SIGTERM - we shouldn't be here long */
+                if (g_obj_wait(&g_sigchld_event, 1, NULL, 0, -1) != 0)
+                {
+                    /* should not get here */
+                    LOG(LOG_LEVEL_WARNING, "session_send_term: "
+                        "Unexpected error from g_obj_wait()");
+                    g_sleep(100);
+                }
+                else
+                {
+                    g_reset_wait_obj(g_sigchld_event);
+                    session_process_sigchld_event(sd);
+                }
             }
         }
     }

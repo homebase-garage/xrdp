@@ -15,6 +15,8 @@ sbin_PROGRAMS = \
   xrdp-sesman
 
 xrdp_sesman_SOURCES = \
+  display_utils.c \
+  display_utils.h \
   eicp_process.c \
   eicp_process.h \
   ercp_process.c \

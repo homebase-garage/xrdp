@@ -44,10 +44,10 @@ struct guid;
 /* Message codes */
 enum ercp_msg_code
 {
-    E_ERCP_SESSION_ANNOUNCE_EVENT,
-    E_ERCP_SESSION_FINISHED_EVENT,
+    E_ERCP_SESSION_ANNOUNCE_EVENT, // sesexec -> sesman
+    E_ERCP_SESSION_FINISHED_EVENT, // sesexec -> sesman
 
-    E_ERCP_SESSION_RECONNECT_EVENT
+    E_ERCP_SESSION_RECONNECT_EVENT // sesman -> sesexec
 };
 
 /* Common facilities */
@@ -224,8 +224,6 @@ ercp_get_session_announce_event(struct trans *trans,
  */
 int
 ercp_send_session_finished_event(struct trans *trans);
-
-
 
 /**
  * Send an E_ERCP_SESSION_RECONNECT_EVENT
