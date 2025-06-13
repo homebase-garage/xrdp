@@ -67,6 +67,8 @@ libcommon_la_SOURCES = \
   rail.h \
   scancode.c \
   scancode.h \
+  set_int.c \
+  set_int.h \
   ssl_calls.c \
   ssl_calls.h \
   string_calls.c \
