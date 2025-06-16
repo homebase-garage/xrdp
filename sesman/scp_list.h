@@ -52,7 +52,15 @@ enum sli_login_state
 enum scp_list_dispatcher_action
 {
     E_SLD_NONE = 0,
+    /**
+     * Remove the client transport as sesexec is
+     * temporarily handling the call.
+     */
     E_SLD_REMOVE_CLIENT_TRANS,
+    /**
+     * Completely remove the client transport as we won't
+     * be using it again
+     */
     E_SLD_TERMINATE_SCP_CONN
 };
 
