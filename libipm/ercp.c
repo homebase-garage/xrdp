@@ -41,7 +41,8 @@ msgno_to_str(unsigned short n)
         (n == E_ERCP_SESSION_ANNOUNCE_EVENT) ? "ERCP_SESSION_ANNOUNCE_EVENT" :
         (n == E_ERCP_SESSION_FINISHED_EVENT) ? "ERCP_SESSION_FINISHED_EVENT" :
 
-        (n == E_ERCP_SESSION_RECONNECT_EVENT) ? "ERCP_SESSION_RECONNECT_EVENT" :
+        (n == E_ERCP_CONNECT_SESSION_REQUEST) ? "ERCP_CONNECT_SESSION_REQUEST" :
+
         NULL;
 }
 
@@ -234,8 +235,30 @@ ercp_send_session_finished_event(struct trans *trans)
 /*****************************************************************************/
 
 int
-ercp_send_session_reconnect_event(struct trans *trans)
+ercp_send_connect_session_request(struct trans *trans,
+                                  int scp_fd,
+                                  unsigned int scp_flags)
 {
     return libipm_msg_out_simple_send(
-               trans, (int)E_ERCP_SESSION_RECONNECT_EVENT, NULL);
+               trans, (int)E_ERCP_CONNECT_SESSION_REQUEST,
+               "hu", scp_fd, scp_flags);
+}
+
+/*****************************************************************************/
+
+int
+ercp_get_connect_session_request(struct trans *trans,
+                                 int *scp_fd,
+                                 unsigned int *scp_flags)
+{
+    /* Intermediate values */
+    uint32_t i_flags;
+
+    int rv = libipm_msg_in_parse(trans, "hu", scp_fd, &i_flags);
+    if (rv == 0)
+    {
+        *scp_flags = i_flags;
+    }
+
+    return rv;
 }

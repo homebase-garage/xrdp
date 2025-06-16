@@ -362,5 +362,4 @@ eicp_get_create_session_response(struct trans *trans,
                                  enum scp_screate_status *status,
                                  struct guid *guid);
 
-
 #endif /* EICP_H */
