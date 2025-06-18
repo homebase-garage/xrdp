@@ -154,6 +154,17 @@ struct scp_session_info *
 session_list_get_byuid(const uid_t *uid, unsigned int *cnt, unsigned int flags);
 
 /**
+ * @brief retrieves a session by GUID
+ * @param guid GUID of session
+ * @return Pointer to session, or NULL.
+ *
+ * The caller is responsible for checking the client has
+ * permissions to access the session.
+ */
+struct session_item *
+session_list_get_byguid(const struct guid *guid);
+
+/**
  *
  * @brief Frees the result of session_get_byuser()
  * @param sesslist Resuit of session_get_byuser()

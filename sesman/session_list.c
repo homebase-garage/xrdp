@@ -362,6 +362,25 @@ session_list_get_byuid(const uid_t *uid, unsigned int *cnt, unsigned int flags)
 }
 
 /******************************************************************************/
+struct session_item *
+session_list_get_byguid(const struct guid *guid)
+{
+    int i;
+
+    for (i = 0 ; i < g_session_list->count ; ++i)
+    {
+        struct session_item *si;
+        si = (struct session_item *)list_get_item(g_session_list, i);
+        if (SESSION_IN_USE(si) && GUID_ARE_EQUAL(guid, &si->guid))
+        {
+            return si;
+        }
+    }
+
+    return NULL;
+}
+
+/******************************************************************************/
 void
 free_session_info_list(struct scp_session_info *sesslist, unsigned int cnt)
 {

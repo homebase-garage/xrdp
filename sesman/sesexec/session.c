@@ -33,6 +33,7 @@
 #include "config_ac.h"
 #endif
 
+#include <stdio.h>
 #include <errno.h>
 
 #include "arch.h"
@@ -49,6 +50,7 @@
 #include "sesexec.h"
 #include "sessionrecord.h"
 #include "string_calls.h"
+#include "trans.h"
 #include "xauth.h"
 #include "xwait.h"
 #include "xrdp_sockets.h"
@@ -59,6 +61,7 @@ struct session_data
     pid_t win_mgr; ///< PID of window manager
     pid_t chansrv; //< PID of chansrv
     time_t start_time;
+    unsigned int connect_count;
     struct session_parameters params;
     // Flexible array member used to store strings in params and ip_addr;
 #ifdef __cplusplus
@@ -95,6 +98,7 @@ session_data_new(const struct session_parameters *sp)
         sd->x_server = -1;
         sd->chansrv = -1;
         sd->start_time = 0;
+        sd->connect_count = 0;
 
         /* Copy all the non-string session parameters... */
         sd->params = *sp;
@@ -184,7 +188,7 @@ dumpItemsToString(struct list *self, char *outstr, int len)
 
 /******************************************************************************/
 static void
-start_chansrv(struct login_info *login_info,
+start_chansrv(const struct login_info *login_info,
               const struct session_parameters *s)
 {
     struct list *chansrv_params = list_create();
@@ -222,7 +226,7 @@ start_chansrv(struct login_info *login_info,
 
 /******************************************************************************/
 static void
-start_window_manager(struct login_info *login_info,
+start_window_manager(const struct login_info *login_info,
                      const struct session_parameters *s)
 {
     char text[256];
@@ -471,7 +475,7 @@ prepare_xvnc_xserver_params(const struct session_parameters *s,
 /******************************************************************************/
 /* Either execs the X server, or returns */
 static void
-start_x_server(struct login_info *login_info,
+start_x_server(const struct login_info *login_info,
                const struct session_parameters *s)
 {
     char authfile[256]; /* The filename for storing xauth information */
@@ -575,8 +579,8 @@ start_x_server(struct login_info *login_info,
  * Simple helper process to fork a child and log errors */
 static int
 fork_child(
-    void (*runproc)(struct login_info *, const struct session_parameters *),
-    struct login_info *login_info,
+    void (*runproc)(const struct login_info *, const struct session_parameters *),
+    const struct login_info *login_info,
     const struct session_parameters *s,
     pid_t group_pid)
 {
@@ -1066,6 +1070,20 @@ session_get_start_time(const struct session_data *sd)
 }
 
 /******************************************************************************/
+unsigned int
+session_get_connect_count(const struct session_data *sd)
+{
+    return (sd == NULL) ? 0 : sd->connect_count;
+}
+
+/******************************************************************************/
+unsigned int
+session_increment_connect_count(struct session_data *sd)
+{
+    return (sd == NULL) ? 0 : sd->connect_count++;
+}
+
+/******************************************************************************/
 const struct session_parameters *
 session_get_parameters(const struct session_data *sd)
 {
@@ -1110,7 +1128,7 @@ session_send_term(struct session_data *sd, int wait_for_all)
 
 /******************************************************************************/
 static void
-start_reconnect_script(struct login_info *login_info,
+start_reconnect_script(const struct login_info *login_info,
                        const struct session_parameters *s)
 {
     env_set_user(login_info->uid, 0, s->display,
@@ -1143,12 +1161,122 @@ start_reconnect_script(struct login_info *login_info,
 
 /******************************************************************************/
 void
-session_reconnect(struct login_info *login_info,
-                  struct session_data *sd)
+session_run_reconnect_script(const struct login_info *login_info,
+                             const struct session_data *sd)
 {
     if (fork_child(start_reconnect_script,
                    login_info, &sd->params, sd->x_server) < 0)
     {
         LOG(LOG_LEVEL_ERROR, "Failed to fork for session reconnection script");
     }
+}
+
+/******************************************************************************/
+int
+session_get_display_server_fd(const struct login_info *login_info,
+                              const struct session_data *sd)
+{
+    char portname[XRDP_SOCKETS_MAXPATH];
+    const char *localhost = "localhost"; // Ignored for TRANS_MODE_UNIX
+    int socket_mode;
+
+    int rv = -1;
+
+    if (sd->x_server <= 0)
+    {
+        LOG(LOG_LEVEL_ERROR,
+            "Request to connect to display server :%u"
+            " which has exited", sd->params.display);
+    }
+    else
+    {
+        switch (sd->params.type)
+        {
+            case SCP_SESSION_TYPE_XVNC:
+                socket_mode = TRANS_MODE_TCP;
+                snprintf(portname, sizeof(portname), "%u",
+                         5900 + sd->params.display);
+                break;
+
+            case SCP_SESSION_TYPE_XVNC_UDS:
+            case SCP_SESSION_TYPE_XORG:
+                socket_mode = TRANS_MODE_UNIX;
+                snprintf(portname, sizeof(portname), XRDP_X11RDP_STR,
+                         login_info->uid, (int)sd->params.display);
+
+                break;
+
+            default:
+                LOG(LOG_LEVEL_ERROR, "Unsupported session type %d for connect",
+                    sd->params.type);
+                portname[0] = '\0';
+        }
+
+        if (portname[0] != '\0')
+        {
+            // Use the transport library to get the fd
+            struct trans *t = trans_create(socket_mode, 8 * 8192, 8192);
+            if (t == NULL)
+            {
+                LOG(LOG_LEVEL_ERROR, "Out of memory creating transport");
+            }
+            else if (trans_connect(t, localhost, portname, 3000) != 0)
+            {
+                LOG(LOG_LEVEL_ERROR, "Can't connect to display server :%u [%s]",
+                    sd->params.display,
+                    g_get_strerror());
+            }
+            else
+            {
+                rv = t->sck;
+                t->sck = -1;
+            }
+            trans_delete(t);
+        }
+    }
+
+    return rv;
+}
+
+/******************************************************************************/
+int
+session_get_chansrv_fd(const struct login_info *login_info,
+                       const struct session_data *sd)
+{
+    char portname[XRDP_SOCKETS_MAXPATH];
+
+    int rv = -1;
+
+    if (sd->chansrv <= 0)
+    {
+        LOG(LOG_LEVEL_ERROR,
+            "Request to connect to chansrv :%u"
+            " which has exited", sd->params.display);
+    }
+    else
+    {
+        snprintf(portname, sizeof(portname),
+                 XRDP_CHANSRV_STR, login_info->uid, (int)sd->params.display);
+
+        // Use the transport library to get the fd
+        struct trans *t = trans_create(TRANS_MODE_UNIX, 8192, 8192);
+        if (t == NULL)
+        {
+            LOG(LOG_LEVEL_ERROR, "Out of memory creating transport");
+        }
+        else if (trans_connect(t, NULL, portname, 10 * 1000) != 0)
+        {
+            LOG(LOG_LEVEL_ERROR, "Can't connect to chansrv :%u [%s]",
+                sd->params.display,
+                g_get_strerror());
+        }
+        else
+        {
+            rv = t->sck;
+            t->sck = -1;
+        }
+        trans_delete(t);
+    }
+
+    return rv;
 }
