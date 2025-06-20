@@ -41,7 +41,7 @@ lib_mod_start(struct mod *mod, int w, int h, int bpp)
 /******************************************************************************/
 /* return error */
 static int
-lib_mod_connect(struct mod *mod)
+lib_mod_connect(struct mod *mod, int fd)
 {
     LOG_DEVEL(LOG_LEVEL_TRACE, "in lib_mod_connect");
     LOG_DEVEL(LOG_LEVEL_TRACE, "out lib_mod_connect");

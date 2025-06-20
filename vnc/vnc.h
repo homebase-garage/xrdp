@@ -83,7 +83,7 @@ struct vnc
     int version; /* internal version */
     /* client functions */
     int (*mod_start)(struct vnc *v, int w, int h, int bpp);
-    int (*mod_connect)(struct vnc *v);
+    int (*mod_connect)(struct vnc *v, int fd);
     int (*mod_event)(struct vnc *v, int msg, long param1, long param2,
                      long param3, long param4);
     int (*mod_signal)(struct vnc *v);

@@ -55,7 +55,7 @@ struct xrdp_mod
     int version; /* internal version */
     /* client functions */
     int (*mod_start)(struct xrdp_mod *v, int w, int h, int bpp);
-    int (*mod_connect)(struct xrdp_mod *v);
+    int (*mod_connect)(struct xrdp_mod *v, int fd);
     int (*mod_event)(struct xrdp_mod *v, int msg, long param1, long param2,
                      long param3, long param4);
     int (*mod_signal)(struct xrdp_mod *v);

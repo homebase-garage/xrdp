@@ -261,7 +261,7 @@ lib_send_client_info(struct mod *mod)
 /******************************************************************************/
 /* return error */
 static int
-lib_mod_connect(struct mod *mod)
+lib_mod_connect(struct mod *mod, int fd)
 {
     int error;
     int socket_mode;
@@ -356,8 +356,19 @@ lib_mod_connect(struct mod *mod)
     mod->trans->no_stream_init_on_data_in = 1;
     mod->trans->extra_flags = 1;
 
-    /* Give the X server a bit of time to start */
-    error = trans_connect(mod->trans, mod->ip, con_port, 30 * 1000);
+    if (fd >= 0)
+    {
+        mod->trans->sck = fd;
+        mod->trans->status = TRANS_STATUS_UP; /* ok */
+        mod->trans->type1 = TRANS_TYPE_CLIENT; /* client */
+        error = 0;
+    }
+    else
+    {
+        /* Give the X server a bit of time to start */
+        error = trans_connect(mod->trans, mod->ip, con_port, 30 * 1000);
+    }
+
     if (error == 0)
     {
         LOG_DEVEL(LOG_LEVEL_INFO, "lib_mod_connect: connected to Xserver "

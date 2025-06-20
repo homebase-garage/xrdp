@@ -182,15 +182,25 @@ set_keyboard_overrides(struct mod *mod)
 }
 
 static int
-lxrdp_connect(struct mod *mod)
+lxrdp_connect(struct mod *mod, int fd)
 {
     boolean ok;
     set_keyboard_overrides(mod);
 
     LOG_DEVEL(LOG_LEVEL_TRACE, "lxrdp_connect:");
 
-    ok = freerdp_connect(mod->inst);
-    LOG_DEVEL(LOG_LEVEL_INFO, "lxrdp_connect: freerdp_connect returned %d", ok);
+    if (fd >= 0)
+    {
+        LOG(LOG_LEVEL_ERROR,
+            "NeutrinoRDP : Can't connect to a file descriptor");
+        ok = 0;
+    }
+    else
+    {
+        ok = freerdp_connect(mod->inst);
+        LOG_DEVEL(LOG_LEVEL_INFO,
+                  "lxrdp_connect: freerdp_connect returned %d", ok);
+    }
 
     if (!ok)
     {
