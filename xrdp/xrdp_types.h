@@ -347,7 +347,8 @@ enum mm_connect_state
     MMCS_GATEWAY_LOGIN,
     MMCS_SESSION_LOGIN,
     MMCS_CREATE_SESSION,
-    MMCS_CONNECT_TO_SESSION,
+    MMCS_GET_SESSION_FILE_DESCRIPTORS,
+    MMCS_CONNECT_TO_DISPLAY_SERVER,
     MMCS_CONNECT_TO_CHANSRV,
     MMCS_DONE
 };
@@ -421,6 +422,9 @@ struct xrdp_mm
     int use_chansrv; /* true if chansrvport is set in xrdp.ini or using sesman */
     struct trans *sesman_trans; /* connection to sesman */
     struct trans *chan_trans; /* connection to chansrv */
+
+    int sesman_display_fd; // Session file descriptor (if use_sesman is set)
+    int sesman_chansrv_fd; // chansrv file descriptor (if use_sesman is set)
 
     /* We can't delete transports while we're in a callback for that
      * transport, as this causes trans.c to reference undefined memory.
