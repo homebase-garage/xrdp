@@ -307,6 +307,9 @@ password=ask
 ; display number of the session, and (if applicable) 'u' with the numeric
 ; UID of the session.
 ;
+; You will also need to change the value of SessionSockdirGroup in
+; sesman.ini to allow xrdp to reach the chansrv instance
+;
 ; If 'username' or 'pamusername' is set, you probably don't need to use
 ; the two parameter variant with 'u'.
 #chansrvport=DISPLAY(n)

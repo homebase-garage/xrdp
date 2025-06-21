@@ -371,9 +371,14 @@ transitions between confinement domains.
 
 .TP
 \fBSessionSockdirGroup\fR=\fIgroup\fR
-Sets the group owner of the directories containing session sockets. This
-MUST be the same as runtime_group in xrdp.ini, or xrdp will not
-be able to connect to any sessions.
+Sets the group owner of the directories containing session sockets.
+
+For normal operation with sesman, set this to 'root' for maximum security.
+
+If you are using xrdp to connect to VNC sessions with X server
+sockets or chansrv sockets in the local sockets dir, set this to
+the runtime_group in xrdp.ini. If you do not do this, xrdp will not
+be able to connect to your sessions.
 
 .SH "X11 SERVER"
 Following parameters can be used in the \fB[Xvnc]\fR and

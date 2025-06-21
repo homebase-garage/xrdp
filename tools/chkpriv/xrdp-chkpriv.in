@@ -28,32 +28,37 @@ DROPPRIV=@pkglibexecdir@/xrdp-droppriv
 
 # Helper functions to print colored tag like "[  OK  ]"
 
-print_ok()
-{
-    if [ -t 1 ]; then
+if [ -t 1 ]; then
+    print_ok()
+    {
         printf "\033[1m[  \033[1;32mOK\033[0m  ]\033[0m "
-    else
-        printf "[  OK  ] "
-    fi
-}
+    }
 
-print_warn()
-{
-    if [ -t 1 ]; then
+    print_warn()
+    {
         printf "\033[1m[ \033[1;33mWARN\033[0m ]\033[0m "
-    else
-        printf "[ WARN ] "
-    fi
-}
+    }
 
-print_ng()
-{
-    if [ -t 1 ]; then
+    print_ng()
+    {
         printf "\033[1m[  \033[1;31mNG\033[0m  ]\033[0m "
-    else
+    }
+else
+    print_ok()
+    {
+        printf "[  OK  ] "
+    }
+
+    print_warn()
+    {
+        printf "[ WARN ] "
+    }
+
+    print_ng()
+    {
         printf "[  NG  ] "
-    fi
-}
+    }
+fi
 
 # -----------------------------------------------------------------------------
 # G E T   I N I   V A L U E
@@ -155,9 +160,16 @@ else
 fi
 
 # Groups agree between sesman and xrdp?
-if [ "$runtime_user" = "$SessionSockdirGroup" ]; then
+if [ -z "$SessionSockdirGroup" ] || [ "$SessionSockdirGroup"  = "root" ]; then
+    print_ok
+    echo "sesman.ini is configured for secure connections to sesman sessions."
+
+elif [ "$SessionSockdirGroup"  = "$runtime_group" ]; then
     print_ok
     echo "xrdp.ini and sesman.ini agree on group ownership"
+    print_warn
+    echo "consider setting SessionSockdirGroup = root for maximum security"
+
 else
     print_ng
     echo "xrdp.ini and sesman.ini do not agree on group ownership"
@@ -214,7 +226,7 @@ fi
 # privileges.  On Debian for example, we might be using the 'ssl-cert'
 # group to obtain access to /etc/ssl/private/ssl-cert-snakeoil.key
 for file in "$certificate" "$key_file"; do
-    if ! [ -e $file ]; then
+    if ! [ -e "$file" ]; then
         print_ng
         echo "$file does not exist"
         errors=$(( errors + 1 ))

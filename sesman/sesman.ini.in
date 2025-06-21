@@ -48,8 +48,14 @@ RestrictInboundClipboard=none
 #XorgNoNewPrivileges=true
 ; Specify the group which is to have read access to the directory where
 ; local sockets for the session are created.
-; This MUST be the same as runtime_group in xrdp.ini, or xrdp will not
-; be able to connect to your sessions.
+; This should take one of the following values:-
+; 1) For normal operation with sesman, set this to 'root' for
+;    maximum security
+; 2) If you are using xrdp to connect to VNC sessions with X server
+;    sockets or chansrv sockets in the local sockets dir, set this to
+;    the runtime_group in xrdp.ini. If you do not do this, xrdp will not
+;    be able to connect to your sessions.
+SessionSockdirGroup=root
 #SessionSockdirGroup=xrdp
 
 

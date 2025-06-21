@@ -415,6 +415,10 @@ Either the first or second form of this setting is recommended. Replace
 required if \fBxrdp\fR is unable to determine the session uid from the
 other values in the connection block.
 
+If you use this setting, you must also set SessionSockdirGroup in
+\fBsesman.ini\fR to be the same as runtime_group in this file. This is
+necessary to give \fBxrdp\fR the privilege to connect to \fBxrdp\-chansrv\fR.
+
 .TP
 \fBkeycode_set\fR=\fI<string>\fR
 [Xorg only] Asks for the specified keycode set to be used by the X server.
