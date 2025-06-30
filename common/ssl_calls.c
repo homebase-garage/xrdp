@@ -1026,7 +1026,8 @@ log_encrypted_file_unsupported(char *buf, int size, int rwflag, void *u)
 
 int
 ssl_tls_accept(struct ssl_tls *self, long ssl_protocols,
-               const char *tls_ciphers)
+               const char *tls_ciphers,
+               int (*is_term)(void))
 {
     int connection_status;
     long options = 0;
@@ -1212,6 +1213,11 @@ ssl_tls_accept(struct ssl_tls *self, long ssl_protocols,
                 case SSL_ERROR_WANT_WRITE:
                     g_sck_can_send(self->trans->sck, SSL_WANT_READ_WRITE_TIMEOUT);
                     break;
+            }
+
+            if (is_term != NULL && (*is_term)())
+            {
+                return 1;
             }
         }
         else

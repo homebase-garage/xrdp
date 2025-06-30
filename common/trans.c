@@ -1053,7 +1053,8 @@ trans_set_tls_mode(struct trans *self, const char *key, const char *cert,
         return 1;
     }
 
-    if (ssl_tls_accept(self->tls, ssl_protocols, tls_ciphers) != 0)
+    if (ssl_tls_accept(self->tls, ssl_protocols,
+                       tls_ciphers, self->is_term) != 0)
     {
         LOG(LOG_LEVEL_ERROR, "trans_set_tls_mode: ssl_tls_accept failed");
         return 1;
