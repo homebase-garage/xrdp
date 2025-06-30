@@ -121,6 +121,9 @@ enum
 
 /**
  * Information about the xrdp client
+ *
+ * Note to maintainers; this structure is no longer shared with
+ * xorgxrdp. See common/xup_client_info.h for that structure.
  */
 struct xrdp_client_info
 {
