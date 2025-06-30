@@ -17,6 +17,7 @@ include_HEADERS = \
   ms-rdperp.h \
   ms-rdpedisp.h \
   ms-smb2.h \
+  xup_client_info.h \
   xrdp_client_info.h \
   xrdp_constants.h \
   xrdp_rail.h \

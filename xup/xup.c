@@ -23,6 +23,7 @@
 #endif
 
 #include "xup.h"
+#include "xup_client_info.h"
 #include "log.h"
 #include "trans.h"
 #include "string_calls.h"
@@ -189,20 +190,65 @@ wait_for_module_caps_message(struct mod *mod)
 }
 
 /******************************************************************************/
+/* Convert the internal xrdp_client_info structure to an
+ * external xup_client_info structure */
+static void
+convert_xrdp_client_info_to_xup_client_info(
+    const struct xrdp_client_info *src,
+    struct xup_client_info *dst)
+{
+    dst->size = sizeof(*dst);
+    dst->version = XUP_CLIENT_INFO_CURRENT_VERSION;
+    dst->bpp = src->bpp;
+    dst->jpeg = src->jpeg;
+    dst->offscreen_support_level = src->offscreen_support_level;
+    dst->offscreen_cache_size = src->offscreen_cache_size;
+    dst->offscreen_cache_entries = src->offscreen_cache_entries;
+
+    memcpy(dst->orders, src->orders, XR_PRIMARY_ORDER_COUNT);
+    dst->order_flags_ex = src->order_flags_ex;
+    dst->pointer_flags = src->pointer_flags;
+    dst->large_pointer_support_flags = src->large_pointer_support_flags;
+
+    dst->display_sizes = src->display_sizes;
+
+    dst->capture_code = src->capture_code;
+    dst->capture_format = src->capture_format;
+
+    memcpy(dst->model, src->model, CI_KBD_MODEL_SIZE);
+    memcpy(dst->layout, src->layout, CI_KBD_LAYOUT_SIZE);
+    memcpy(dst->variant, src->variant, CI_KBD_VARIANT_SIZE);
+    memcpy(dst->options, src->options, CI_KBD_OPTIONS_SIZE);
+    memcpy(dst->xkb_rules, src->xkb_rules, CI_KBD_XKB_RULES_SIZE);
+
+    dst->x11_keycode_caps_lock = src->x11_keycode_caps_lock;
+    dst->x11_keycode_num_lock = src->x11_keycode_num_lock;
+    dst->x11_keycode_scroll_lock = src->x11_keycode_scroll_lock;
+
+    dst->rfx_frame_interval = src->rfx_frame_interval;
+    dst->h264_frame_interval = src->h264_frame_interval;
+    dst->normal_frame_interval = src->normal_frame_interval;
+}
+
+/******************************************************************************/
 /* return error */
 static int
 lib_send_client_info(struct mod *mod)
 {
     struct stream *s;
     int len;
+    struct xup_client_info xup_client_info;
 
     LOG_DEVEL(LOG_LEVEL_TRACE, "lib_send_client_info:");
+
+    convert_xrdp_client_info_to_xup_client_info(&mod->client_info,
+            &xup_client_info);
     make_stream(s);
-    init_stream(s, 8192);
+    init_stream(s, (int)sizeof(xup_client_info) + 64);
     s_push_layer(s, iso_hdr, 4);
     out_uint16_le(s, 104);
-    g_memcpy(s->p, &(mod->client_info), sizeof(mod->client_info));
-    s->p += sizeof(mod->client_info);
+    g_memcpy(s->p, &xup_client_info, sizeof(xup_client_info));
+    s->p += sizeof(xup_client_info);
     s_mark_end(s);
     len = (int)(s->end - s->data);
     s_pop_layer(s, iso_hdr);
@@ -1864,12 +1910,12 @@ lib_mod_process_message(struct mod *mod, struct stream *s)
             {
                 case 100:
                     in_uint32_le(s, version);
-                    if (version != CLIENT_INFO_CURRENT_VERSION)
+                    if (version != XUP_CLIENT_INFO_CURRENT_VERSION)
                     {
                         char msg[128];
                         g_snprintf(msg, sizeof(msg),
                                    "Xorg module has version %d, expected %d",
-                                   version, CLIENT_INFO_CURRENT_VERSION);
+                                   version, XUP_CLIENT_INFO_CURRENT_VERSION);
                         LOG(LOG_LEVEL_ERROR, "%s", msg);
                         mod->server_msg(mod, msg, 0);
                         mod->caps_processing_status = E_CAPS_NOT_OK;

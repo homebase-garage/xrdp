@@ -168,7 +168,7 @@ xrdp_caps_process_order(struct xrdp_rdp *self, struct stream *s,
                         int len)
 {
     int i;
-    char order_caps[32];
+    char order_caps[XR_PRIMARY_ORDER_COUNT];
     int ex_flags;
     int cap_flags;
 
@@ -185,8 +185,8 @@ xrdp_caps_process_order(struct xrdp_rdp *self, struct stream *s,
     in_uint8s(s, 2); /* Max order level */
     in_uint8s(s, 2); /* Number of fonts */
     in_uint16_le(s, cap_flags); /* Capability flags */
-    in_uint8a(s, order_caps, 32); /* Orders supported */
-    g_memcpy(self->client_info.orders, order_caps, 32);
+    in_uint8a(s, order_caps, XR_PRIMARY_ORDER_COUNT); /* Orders supported */
+    g_memcpy(self->client_info.orders, order_caps, XR_PRIMARY_ORDER_COUNT);
 
     LOG_DEVEL(LOG_LEVEL_TRACE, "TS_ORDER_CAPABILITYSET: terminalDescriptor (ignored as per protocol spec)");
     LOG_DEVEL(LOG_LEVEL_TRACE, "TS_ORDER_CAPABILITYSET: desktopSaveXGranularity (ignored as per protocol spec)");
@@ -220,7 +220,7 @@ xrdp_caps_process_order(struct xrdp_rdp *self, struct stream *s,
     LOG_DEVEL(LOG_LEVEL_TRACE, "TS_ORDER_CAPABILITYSET: orderSupport index 26: EllipseCB %d", order_caps[26]);
     LOG_DEVEL(LOG_LEVEL_TRACE, "TS_ORDER_CAPABILITYSET: orderSupport index 27: GlyphIndex %d", order_caps[27]);
     LOG_DEVEL(LOG_LEVEL_TRACE, "TS_ORDER_CAPABILITYSET: orderSupport index 28-31: unused index");
-    LOG_DEVEL_HEXDUMP(LOG_LEVEL_TRACE, "TS_ORDER_CAPABILITYSET: order_caps", order_caps, 32);
+    LOG_DEVEL_HEXDUMP(LOG_LEVEL_TRACE, "TS_ORDER_CAPABILITYSET: order_caps", order_caps, XR_PRIMARY_ORDER_COUNT);
 
     in_uint8s(s, 2); /* Text capability flags */
     LOG_DEVEL(LOG_LEVEL_TRACE, "TS_ORDER_CAPABILITYSET: textFlags (ignored as per protocol spec)");
@@ -228,7 +228,7 @@ xrdp_caps_process_order(struct xrdp_rdp *self, struct stream *s,
     in_uint16_le(s, ex_flags); /* Ex flags */
     LOG_DEVEL(LOG_LEVEL_TRACE, "TS_ORDER_CAPABILITYSET: orderSupportExFlags 0x%4.4x", ex_flags);
 
-    if (cap_flags & 0x80) /* ORDER_FLAGS_EXTRA_SUPPORT */
+    if (cap_flags & ORDERFLAGS_EXTRA_FLAGS)
     {
         self->client_info.order_flags_ex = ex_flags;
         if (ex_flags & XR_ORDERFLAGS_EX_CACHE_BITMAP_REV3_SUPPORT)

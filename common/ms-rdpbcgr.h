@@ -338,6 +338,8 @@
 
 /* Order Capability Set: orderSupportExFlags (2.2.7.1.3)  */
 /* NOTE: XR_ prefixed to avoid conflict with FreeRDP */
+/* XR_PRIMARY_ORDER_COUNT is not an official definition */
+#define XR_PRIMARY_ORDER_COUNT         32
 #define XR_ORDERFLAGS_EX_CACHE_BITMAP_REV3_SUPPORT   0x0002
 #define XR_ORDERFLAGS_EX_ALTSEC_FRAME_MARKER_SUPPORT 0x0004
 
