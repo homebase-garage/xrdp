@@ -48,6 +48,7 @@
 #define SESMAN_CFG_USERWM            "UserWindowManager"
 #define SESMAN_CFG_AUTH_FILE_PATH    "AuthFilePath"
 #define SESMAN_CFG_RECONNECT_SH      "ReconnectScript"
+#define SESMAN_CFG_ALWAYS_RUN_RECONNECT "AlwaysRunReconnect"
 
 #define SESMAN_CFG_XORG_PARAMS       "Xorg"
 #define SESMAN_CFG_VNC_PARAMS        "Xvnc"
@@ -188,6 +189,7 @@ config_read_globals(int file, struct config_sesman *cf, struct list *param_n,
     cf->default_wm = 0;
     cf->auth_file_path = 0;
     cf->reconnect_sh = 0;
+    cf->always_run_reconnect = 0;
 
     file_read_section(file, SESMAN_CFG_GLOBALS, param_n, param_v);
 
@@ -221,6 +223,10 @@ config_read_globals(int file, struct config_sesman *cf, struct list *param_n,
         else if (g_strcasecmp(param, SESMAN_CFG_RECONNECT_SH) == 0)
         {
             cf->reconnect_sh = g_strdup(val);
+        }
+        else if (g_strcasecmp(param, SESMAN_CFG_ALWAYS_RUN_RECONNECT) == 0)
+        {
+            cf->always_run_reconnect = g_text2bool(val);
         }
         else if (0 == g_strcasecmp(param, SESMAN_CFG_ADDRESS))
         {
@@ -676,6 +682,7 @@ config_dump(struct config_sesman *config)
     g_writeln("    UserWindowManager:        %s", config->user_wm);
     g_writeln("    DefaultWindowManager:     %s", config->default_wm);
     g_writeln("    ReconnectScript:          %s", config->reconnect_sh);
+    g_writeln("    AlwaysRunReconnect:       %d", config->always_run_reconnect);
     g_writeln("    AuthFilePath:             %s",
               (config->auth_file_path ? config->auth_file_path : "disabled"));
 

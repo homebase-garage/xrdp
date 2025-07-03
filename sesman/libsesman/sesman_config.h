@@ -220,6 +220,11 @@ struct config_sesman
      */
     char *reconnect_sh;
     /**
+     * @var always_run_reconnect
+     * @brief Do we run the reconnect script on a first connection?
+     */
+    int always_run_reconnect;
+    /**
      * @var auth_file_path
      * @brief Auth file path
      */

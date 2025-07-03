@@ -35,6 +35,7 @@
 #include "sesexec.h"
 #include "os_calls.h"
 #include "session.h"
+#include "sesman_config.h"
 #include "trans.h"
 
 #include "ercp.h"
@@ -100,17 +101,24 @@ handle_connect_session_request(struct trans *self)
 
             if (rv == 0 && scp_status == E_SCP_SCONNECT_OK)
             {
-                // Don't run the reconnect script on the first connect
+                // Don't run the reconnect script on the first connect,
+                // unless we're configured to do so.
                 if (session_increment_connect_count(g_session_data) == 0)
                 {
                     LOG(LOG_LEVEL_INFO, "User %s has connected to a session",
                         g_login_info->username);
+                    if (g_cfg->always_run_reconnect)
+                    {
+                        session_run_reconnect_script(g_login_info,
+                                                     g_session_data);
+                    }
                 }
                 else
                 {
                     LOG(LOG_LEVEL_INFO, "User %s has reconnected to a session",
                         g_login_info->username);
-                    session_run_reconnect_script(g_login_info, g_session_data);
+                    session_run_reconnect_script(g_login_info,
+                                                 g_session_data);
                 }
             }
 

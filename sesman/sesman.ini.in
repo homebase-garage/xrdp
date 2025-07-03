@@ -10,6 +10,10 @@ UserWindowManager=startwm.sh
 DefaultWindowManager=startwm.sh
 ; Give in full path or relative path to @sesmansysconfdir@
 ReconnectScript=reconnectwm.sh
+; Set this to 'yes' if you wish to reconnect script to be run on
+; the first connection to a session. Normally the script is
+; only run on reconnections.
+#AlwaysRunReconnect=no
 
 [Security]
 AllowRootLogin=true

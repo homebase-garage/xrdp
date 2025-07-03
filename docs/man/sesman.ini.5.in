@@ -86,6 +86,11 @@ to the existing session. If the path is not a full path, it will be resolved as
 relative path to \fI@xrdpconfdir@\fR. If not specified, defaults to
 \fI@xrdpconfdir@/reconnectwm.sh\fR.
 
+.TP
+\fBAlwaysRunReconnect\fR=\fI[yes|no]\fR
+If set to \fB1\fR, \fBtrue\fR or \fByes\fR, the \fBReconnectScript\fR will
+be run for the initial connection to a session, as well as all reconnects.
+
 .SH "LOGGING"
 Following parameters can be used in the \fB[Logging]\fR and \fB[ChansrvLogging]\fR 
 sections.
