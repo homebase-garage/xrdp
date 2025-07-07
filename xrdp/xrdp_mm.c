@@ -43,10 +43,11 @@
 
 /* Forward declarations */
 static int
-xrdp_mm_chansrv_connect(struct xrdp_mm *self, const char *port);
+xrdp_mm_setup_mod1(struct xrdp_mm *self);
+static int
+xrdp_mm_setup_mod2(struct xrdp_mm *self);
 static void
 xrdp_mm_connect_sm(struct xrdp_mm *self);
-
 static int
 xrdp_mm_send_unicode_shutdown(struct xrdp_mm *self, struct trans *trans);
 
@@ -313,308 +314,6 @@ xrdp_mm_create_session(struct xrdp_mm *self)
                  xserverbpp,
                  self->wm->client_info->program,
                  self->wm->client_info->directory);
-    }
-
-    return rv;
-}
-
-/*****************************************************************************/
-static int
-xrdp_mm_setup_mod1(struct xrdp_mm *self)
-{
-    void *func;
-    const char *lib;
-    char text[256];
-
-    if (self == 0)
-    {
-        return 1;
-    }
-
-    if ((lib = xrdp_mm_get_value(self, "lib")) == NULL)
-    {
-        xrdp_wm_log_msg(self->wm, LOG_LEVEL_ERROR,
-                        "no library name specified in xrdp.ini, please add "
-                        "lib=libxrdp-vnc.so or similar");
-
-        return 1;
-    }
-
-    if (lib[0] == 0)
-    {
-        xrdp_wm_log_msg(self->wm, LOG_LEVEL_ERROR,
-                        "empty library name specified in xrdp.ini, please "
-                        "add lib=libxrdp-vnc.so or similar");
-
-        return 1;
-    }
-
-    if (self->mod_handle == 0)
-    {
-        g_snprintf(text, sizeof(text), "%s/%s", XRDP_MODULE_PATH, lib);
-        /* Let the main thread load the lib,*/
-        self->mod_handle = g_xrdp_sync(xrdp_mm_sync_load, (tintptr)text, 0);
-
-        if (self->mod_handle != 0)
-        {
-            func = g_get_proc_address(self->mod_handle, "mod_init");
-
-            if (func == 0)
-            {
-                func = g_get_proc_address(self->mod_handle, "_mod_init");
-            }
-
-            if (func == 0)
-            {
-                xrdp_wm_log_msg(self->wm, LOG_LEVEL_ERROR,
-                                "error finding proc mod_init in %s, "
-                                "not a valid xrdp backend", lib);
-            }
-
-            self->mod_init = (struct xrdp_mod * ( *)(void))func;
-            func = g_get_proc_address(self->mod_handle, "mod_exit");
-
-            if (func == 0)
-            {
-                func = g_get_proc_address(self->mod_handle, "_mod_exit");
-            }
-
-            if (func == 0)
-            {
-                xrdp_wm_log_msg(self->wm, LOG_LEVEL_ERROR,
-                                "error finding proc mod_exit in %s, "
-                                "not a valid xrdp backend", lib);
-            }
-
-            self->mod_exit = (int ( *)(struct xrdp_mod *))func;
-
-            if ((self->mod_init != 0) && (self->mod_exit != 0))
-            {
-                self->mod = self->mod_init();
-
-                if (self->mod != 0)
-                {
-                    LOG(LOG_LEVEL_INFO, "loaded module '%s' ok, interface size %d, version %d", lib,
-                        self->mod->size, self->mod->version);
-                }
-            }
-            else
-            {
-                LOG(LOG_LEVEL_ERROR, "no mod_init or mod_exit address found");
-            }
-        }
-        else
-        {
-            xrdp_wm_log_msg(self->wm, LOG_LEVEL_ERROR,
-                            "error loading %s specified in xrdp.ini, please "
-                            "add a valid entry like lib=libxrdp-vnc.so or "
-                            "similar", lib);
-            return 1;
-        }
-
-        if (self->mod != 0)
-        {
-            self->mod->wm = (long)(self->wm);
-            self->mod->server_begin_update = server_begin_update;
-            self->mod->server_end_update = server_end_update;
-            self->mod->server_bell_trigger = server_bell_trigger;
-            self->mod->server_chansrv_in_use = server_chansrv_in_use;
-            self->mod->server_init_xkb_layout = server_init_xkb_layout;
-            self->mod->server_fill_rect = server_fill_rect;
-            self->mod->server_screen_blt = server_screen_blt;
-            self->mod->server_paint_rect = server_paint_rect;
-            self->mod->server_set_pointer = server_set_pointer;
-            self->mod->server_set_pointer_ex = server_set_pointer_ex;
-            self->mod->server_palette = server_palette;
-            self->mod->server_msg = server_msg;
-            self->mod->server_is_term = g_is_term;
-            self->mod->server_set_clip = server_set_clip;
-            self->mod->server_reset_clip = server_reset_clip;
-            self->mod->server_set_fgcolor = server_set_fgcolor;
-            self->mod->server_set_bgcolor = server_set_bgcolor;
-            self->mod->server_set_opcode = server_set_opcode;
-            self->mod->server_set_mixmode = server_set_mixmode;
-            self->mod->server_set_brush = server_set_brush;
-            self->mod->server_set_pen = server_set_pen;
-            self->mod->server_draw_line = server_draw_line;
-            self->mod->server_add_char = server_add_char;
-            self->mod->server_draw_text = server_draw_text;
-            self->mod->client_monitor_resize = client_monitor_resize;
-            self->mod->server_monitor_resize_done = server_monitor_resize_done;
-            self->mod->server_get_channel_count = server_get_channel_count;
-            self->mod->server_query_channel = server_query_channel;
-            self->mod->server_get_channel_id = server_get_channel_id;
-            self->mod->server_send_to_channel = server_send_to_channel;
-            self->mod->server_create_os_surface = server_create_os_surface;
-            self->mod->server_switch_os_surface = server_switch_os_surface;
-            self->mod->server_delete_os_surface = server_delete_os_surface;
-            self->mod->server_paint_rect_os = server_paint_rect_os;
-            self->mod->server_set_hints = server_set_hints;
-            self->mod->server_window_new_update = server_window_new_update;
-            self->mod->server_window_delete = server_window_delete;
-            self->mod->server_window_icon = server_window_icon;
-            self->mod->server_window_cached_icon = server_window_cached_icon;
-            self->mod->server_notify_new_update = server_notify_new_update;
-            self->mod->server_notify_delete = server_notify_delete;
-            self->mod->server_monitored_desktop = server_monitored_desktop;
-            self->mod->server_add_char_alpha = server_add_char_alpha;
-            self->mod->server_create_os_surface_bpp = server_create_os_surface_bpp;
-            self->mod->server_paint_rect_bpp = server_paint_rect_bpp;
-            self->mod->server_composite = server_composite;
-            self->mod->server_paint_rects = server_paint_rects;
-            self->mod->server_session_info = server_session_info;
-            self->mod->server_egfx_cmd = server_egfx_cmd;
-            self->mod->server_set_pointer_large = server_set_pointer_large;
-            self->mod->server_paint_rects_ex = server_paint_rects_ex;
-            self->mod->server_set_pointer_system = server_set_pointer_system;
-            self->mod->si = &(self->wm->session->si);
-        }
-    }
-
-    /* id self->mod is null, there must be a problem */
-    if (self->mod == 0)
-    {
-        LOG(LOG_LEVEL_ERROR, "problem loading lib in xrdp_mm_setup_mod1");
-        return 1;
-    }
-
-    return 0;
-}
-
-/*****************************************************************************/
-static int
-xrdp_mm_setup_mod2(struct xrdp_mm *self)
-{
-    char text[256];
-    const char *name;
-    const char *value;
-    int i;
-    int rv;
-    int key_flags;
-    int device_flags;
-
-    rv = 1; /* failure */
-    g_memset(text, 0, sizeof(text));
-
-    if (!g_is_wait_obj_set(self->wm->pro_layer->self_term_event))
-    {
-        if (self->mod->mod_start(self->mod, self->wm->screen->width,
-                                 self->wm->screen->height,
-                                 self->wm->screen->bpp) != 0)
-        {
-            g_set_wait_obj(self->wm->pro_layer->self_term_event); /* kill session */
-        }
-    }
-
-    if (!g_is_wait_obj_set(self->wm->pro_layer->self_term_event))
-    {
-        if (self->display > 0)
-        {
-            if (self->code == XVNC_SESSION_CODE)
-            {
-                g_snprintf(text, sizeof(text), "%d", 5900 + self->display);
-            }
-            else if (self->code == XORG_SESSION_CODE ||
-                     self->code == XVNC_UDS_SESSION_CODE)
-            {
-                g_snprintf(text, sizeof(text), XRDP_X11RDP_STR,
-                           self->uid, self->display);
-            }
-            else
-            {
-                g_set_wait_obj(self->wm->pro_layer->self_term_event); /* kill session */
-            }
-        }
-    }
-
-    if (!g_is_wait_obj_set(self->wm->pro_layer->self_term_event))
-    {
-        /* this adds the port to the end of the list, it will already be in
-           the list as -1
-           the module should use the last one */
-        if (g_strlen(text) > 0)
-        {
-            list_add_strdup(self->login_names, "port");
-            list_add_strdup(self->login_values, text);
-        }
-
-        /* always set these */
-
-        self->mod->mod_set_param(self->mod, "client_info",
-                                 (const char *) (self->wm->session->client_info));
-
-        name = self->wm->session->client_info->hostname;
-        self->mod->mod_set_param(self->mod, "hostname", name);
-        g_snprintf(text, 255, "%d", self->wm->session->client_info->keylayout);
-        self->mod->mod_set_param(self->mod, "keylayout", text);
-        if (guid_is_set(&self->guid))
-        {
-            self->mod->mod_set_param(self->mod, "guid", (char *) &self->guid);
-        }
-
-        for (i = 0; i < self->login_names->count; i++)
-        {
-            name = (const char *) list_get_item(self->login_names, i);
-            value = (const char *) list_get_item(self->login_values, i);
-            self->mod->mod_set_param(self->mod, name, value);
-        }
-
-        /* connect */
-        if (self->mod->mod_connect(self->mod) == 0)
-        {
-            rv = 0; /* connect success */
-
-            // If we've received a recent TS_SYNC_EVENT, pass it on to
-            // the module so (e.g.) NumLock starts in the right state.
-            if (self->last_sync_saved)
-            {
-                int key_flags = self->last_sync_key_flags;
-                int device_flags = self->last_sync_device_flags;
-                self->last_sync_saved = 0;
-                self->mod->mod_event(self->mod, WM_KEYBRD_SYNC, key_flags,
-                                     device_flags, key_flags, device_flags);
-
-            }
-        }
-        else
-        {
-            xrdp_wm_show_log(self->wm);
-            if (self->wm->hide_log_window)
-            {
-                rv = 1;
-            }
-        }
-    }
-
-    if (rv == 0)
-    {
-        /* sync modifiers */
-        key_flags = 0;
-        device_flags = 0;
-
-        if (self->wm->scroll_lock)
-        {
-            key_flags |= 1;
-        }
-
-        if (self->wm->num_lock)
-        {
-            key_flags |= 2;
-        }
-
-        if (self->wm->caps_lock)
-        {
-            key_flags |= 4;
-        }
-
-        if (self->mod != 0)
-        {
-            if (self->mod->mod_event != 0)
-            {
-                self->mod->mod_event(self->mod, WM_KEYBRD_SYNC, key_flags,
-                                     device_flags, key_flags, device_flags);
-            }
-        }
     }
 
     return rv;
@@ -4073,7 +3772,7 @@ get_painter(struct xrdp_mod *mod)
 #endif
 
 /*****************************************************************************/
-int
+static int
 server_begin_update(struct xrdp_mod *mod)
 {
     struct xrdp_wm *wm;
@@ -4087,7 +3786,7 @@ server_begin_update(struct xrdp_mod *mod)
 }
 
 /*****************************************************************************/
-int
+static int
 server_end_update(struct xrdp_mod *mod)
 {
     struct xrdp_painter *p;
@@ -4107,7 +3806,7 @@ server_end_update(struct xrdp_mod *mod)
 
 /*****************************************************************************/
 /* got bell signal... try to send to client */
-int
+static int
 server_bell_trigger(struct xrdp_mod *mod)
 {
     struct xrdp_wm *wm;
@@ -4119,7 +3818,7 @@ server_bell_trigger(struct xrdp_mod *mod)
 
 /*****************************************************************************/
 /* Chansrv in use on this configuration? */
-int
+static int
 server_chansrv_in_use(struct xrdp_mod *mod)
 {
     struct xrdp_wm *wm;
@@ -4130,7 +3829,7 @@ server_chansrv_in_use(struct xrdp_mod *mod)
 
 /*****************************************************************************/
 /* Init the XKB layout */
-void
+static void
 server_init_xkb_layout(struct xrdp_mod *mod,
                        struct xrdp_client_info *client_info)
 {
@@ -4139,7 +3838,7 @@ server_init_xkb_layout(struct xrdp_mod *mod,
 
 
 /*****************************************************************************/
-int
+static int
 server_fill_rect(struct xrdp_mod *mod, int x, int y, int cx, int cy)
 {
     struct xrdp_wm *wm;
@@ -4158,7 +3857,7 @@ server_fill_rect(struct xrdp_mod *mod, int x, int y, int cx, int cy)
 }
 
 /*****************************************************************************/
-int
+static int
 server_screen_blt(struct xrdp_mod *mod, int x, int y, int cx, int cy,
                   int srcx, int srcy)
 {
@@ -4179,7 +3878,7 @@ server_screen_blt(struct xrdp_mod *mod, int x, int y, int cx, int cy,
 }
 
 /*****************************************************************************/
-int
+static int
 server_paint_rect(struct xrdp_mod *mod, int x, int y, int cx, int cy,
                   char *data, int width, int height, int srcx, int srcy)
 {
@@ -4202,7 +3901,7 @@ server_paint_rect(struct xrdp_mod *mod, int x, int y, int cx, int cy,
 }
 
 /*****************************************************************************/
-int
+static int
 server_paint_rect_bpp(struct xrdp_mod *mod, int x, int y, int cx, int cy,
                       char *data, int width, int height, int srcx, int srcy,
                       int bpp)
@@ -4224,7 +3923,7 @@ server_paint_rect_bpp(struct xrdp_mod *mod, int x, int y, int cx, int cy,
 }
 
 /*****************************************************************************/
-int
+static int
 server_composite(struct xrdp_mod *mod, int srcidx, int srcformat,
                  int srcwidth, int srcrepeat, int *srctransform,
                  int mskflags, int mskidx, int mskformat, int mskwidth,
@@ -4275,18 +3974,7 @@ server_composite(struct xrdp_mod *mod, int srcidx, int srcformat,
 }
 
 /*****************************************************************************/
-int
-server_paint_rects(struct xrdp_mod *mod, int num_drects, short *drects,
-                   int num_crects, short *crects, char *data, int width,
-                   int height, int flags, int frame_id)
-{
-    return server_paint_rects_ex(mod, num_drects, drects, num_crects, crects,
-                                 data, 0, 0, width, height, flags, frame_id,
-                                 NULL, 0);
-}
-
-/*****************************************************************************/
-int
+static int
 server_paint_rects_ex(struct xrdp_mod *mod,
                       int num_drects, short *drects,
                       int num_crects, short *crects,
@@ -4408,7 +4096,18 @@ server_paint_rects_ex(struct xrdp_mod *mod,
 }
 
 /*****************************************************************************/
-int
+static int
+server_paint_rects(struct xrdp_mod *mod, int num_drects, short *drects,
+                   int num_crects, short *crects, char *data, int width,
+                   int height, int flags, int frame_id)
+{
+    return server_paint_rects_ex(mod, num_drects, drects, num_crects, crects,
+                                 data, 0, 0, width, height, flags, frame_id,
+                                 NULL, 0);
+}
+
+/*****************************************************************************/
+static int
 server_session_info(struct xrdp_mod *mod, const char *data, int data_bytes)
 {
     struct xrdp_wm *wm;
@@ -4419,7 +4118,7 @@ server_session_info(struct xrdp_mod *mod, const char *data, int data_bytes)
 }
 
 /*****************************************************************************/
-int
+static int
 server_egfx_cmd(struct xrdp_mod *mod,
                 char *cmd, int cmd_bytes,
                 char *data, int data_bytes)
@@ -4476,7 +4175,7 @@ server_egfx_cmd(struct xrdp_mod *mod,
 }
 
 /*****************************************************************************/
-int
+static int
 server_set_pointer_system(struct xrdp_mod *mod, int pointer_type)
 {
     struct xrdp_wm *wm;
@@ -4487,7 +4186,7 @@ server_set_pointer_system(struct xrdp_mod *mod, int pointer_type)
 }
 
 /*****************************************************************************/
-int
+static int
 server_set_pointer(struct xrdp_mod *mod, int x, int y,
                    char *data, char *mask)
 {
@@ -4499,7 +4198,7 @@ server_set_pointer(struct xrdp_mod *mod, int x, int y,
 }
 
 /*****************************************************************************/
-int
+static int
 server_set_pointer_ex(struct xrdp_mod *mod, int x, int y,
                       char *data, char *mask, int bpp)
 {
@@ -4511,7 +4210,7 @@ server_set_pointer_ex(struct xrdp_mod *mod, int x, int y,
 }
 
 /*****************************************************************************/
-int
+static int
 server_set_pointer_large(struct xrdp_mod *mod, int x, int y,
                          char *data, char *mask, int bpp,
                          int width, int height)
@@ -4524,7 +4223,7 @@ server_set_pointer_large(struct xrdp_mod *mod, int x, int y,
 }
 
 /*****************************************************************************/
-int
+static int
 server_palette(struct xrdp_mod *mod, int *palette)
 {
     struct xrdp_wm *wm;
@@ -4541,7 +4240,7 @@ server_palette(struct xrdp_mod *mod, int *palette)
 }
 
 /*****************************************************************************/
-int
+static int
 server_msg(struct xrdp_mod *mod, const char *msg, int code)
 {
     struct xrdp_wm *wm;
@@ -4557,7 +4256,7 @@ server_msg(struct xrdp_mod *mod, const char *msg, int code)
 }
 
 /*****************************************************************************/
-int
+static int
 server_set_clip(struct xrdp_mod *mod, int x, int y, int cx, int cy)
 {
     struct xrdp_painter *p;
@@ -4573,7 +4272,7 @@ server_set_clip(struct xrdp_mod *mod, int x, int y, int cx, int cy)
 }
 
 /*****************************************************************************/
-int
+static int
 server_reset_clip(struct xrdp_mod *mod)
 {
     struct xrdp_painter *p;
@@ -4589,7 +4288,7 @@ server_reset_clip(struct xrdp_mod *mod)
 }
 
 /*****************************************************************************/
-int
+static int
 server_set_fgcolor(struct xrdp_mod *mod, int fgcolor)
 {
     struct xrdp_painter *p;
@@ -4607,7 +4306,7 @@ server_set_fgcolor(struct xrdp_mod *mod, int fgcolor)
 }
 
 /*****************************************************************************/
-int
+static int
 server_set_bgcolor(struct xrdp_mod *mod, int bgcolor)
 {
     struct xrdp_painter *p;
@@ -4624,7 +4323,7 @@ server_set_bgcolor(struct xrdp_mod *mod, int bgcolor)
 }
 
 /*****************************************************************************/
-int
+static int
 server_set_opcode(struct xrdp_mod *mod, int opcode)
 {
     struct xrdp_painter *p;
@@ -4641,7 +4340,7 @@ server_set_opcode(struct xrdp_mod *mod, int opcode)
 }
 
 /*****************************************************************************/
-int
+static int
 server_set_mixmode(struct xrdp_mod *mod, int mixmode)
 {
     struct xrdp_painter *p;
@@ -4658,7 +4357,7 @@ server_set_mixmode(struct xrdp_mod *mod, int mixmode)
 }
 
 /*****************************************************************************/
-int
+static int
 server_set_brush(struct xrdp_mod *mod, int x_origin, int y_origin,
                  int style, char *pattern)
 {
@@ -4679,7 +4378,7 @@ server_set_brush(struct xrdp_mod *mod, int x_origin, int y_origin,
 }
 
 /*****************************************************************************/
-int
+static int
 server_set_pen(struct xrdp_mod *mod, int style, int width)
 {
     struct xrdp_painter *p;
@@ -4697,7 +4396,7 @@ server_set_pen(struct xrdp_mod *mod, int style, int width)
 }
 
 /*****************************************************************************/
-int
+static int
 server_draw_line(struct xrdp_mod *mod, int x1, int y1, int x2, int y2)
 {
     struct xrdp_wm *wm;
@@ -4715,7 +4414,7 @@ server_draw_line(struct xrdp_mod *mod, int x1, int y1, int x2, int y2)
 }
 
 /*****************************************************************************/
-int
+static int
 server_add_char(struct xrdp_mod *mod, int font, int character,
                 int offset, int baseline,
                 int width, int height, char *data)
@@ -4734,7 +4433,7 @@ server_add_char(struct xrdp_mod *mod, int font, int character,
 }
 
 /*****************************************************************************/
-int
+static int
 server_draw_text(struct xrdp_mod *mod, int font,
                  int flags, int mixmode, int clip_left, int clip_top,
                  int clip_right, int clip_bottom,
@@ -4762,7 +4461,7 @@ server_draw_text(struct xrdp_mod *mod, int font,
 }
 
 /*****************************************************************************/
-int
+static int
 client_monitor_resize(struct xrdp_mod *mod, int width, int height,
                       int num_monitors, const struct monitor_info *monitors)
 {
@@ -4818,7 +4517,7 @@ client_monitor_resize(struct xrdp_mod *mod, int width, int height,
 
 /* Note : if this is called on a multimon setup, the client is resized
  * to a single monitor */
-int
+static int
 server_monitor_resize_done(struct xrdp_mod *mod)
 {
     struct xrdp_wm *wm;
@@ -4856,7 +4555,7 @@ server_monitor_resize_done(struct xrdp_mod *mod)
 
 /*****************************************************************************/
 /*return -1 if channels are controlled by chansrv */
-int
+static int
 server_get_channel_count(struct xrdp_mod *mod)
 {
     struct xrdp_wm *wm;
@@ -4874,7 +4573,7 @@ server_get_channel_count(struct xrdp_mod *mod)
 
 /*****************************************************************************/
 /*return 0 if the index is not found*/
-int
+static int
 server_query_channel(struct xrdp_mod *mod, int index, char *channel_name,
                      int *channel_flags)
 {
@@ -4893,7 +4592,7 @@ server_query_channel(struct xrdp_mod *mod, int index, char *channel_name,
 
 /*****************************************************************************/
 /* returns -1 on error */
-int
+static int
 server_get_channel_id(struct xrdp_mod *mod, const char *name)
 {
     struct xrdp_wm *wm;
@@ -4909,7 +4608,7 @@ server_get_channel_id(struct xrdp_mod *mod, const char *name)
 }
 
 /*****************************************************************************/
-int
+static int
 server_send_to_channel(struct xrdp_mod *mod, int channel_id,
                        char *data, int data_len,
                        int total_data_len, int flags)
@@ -4932,7 +4631,7 @@ server_send_to_channel(struct xrdp_mod *mod, int channel_id,
 }
 
 /*****************************************************************************/
-int
+static int
 server_create_os_surface(struct xrdp_mod *mod, int rdpindex,
                          int width, int height)
 {
@@ -4957,7 +4656,7 @@ server_create_os_surface(struct xrdp_mod *mod, int rdpindex,
 }
 
 /*****************************************************************************/
-int
+static int
 server_create_os_surface_bpp(struct xrdp_mod *mod, int rdpindex,
                              int width, int height, int bpp)
 {
@@ -4980,7 +4679,7 @@ server_create_os_surface_bpp(struct xrdp_mod *mod, int rdpindex,
 }
 
 /*****************************************************************************/
-int
+static int
 server_switch_os_surface(struct xrdp_mod *mod, int rdpindex)
 {
     struct xrdp_wm *wm;
@@ -5028,7 +4727,7 @@ server_switch_os_surface(struct xrdp_mod *mod, int rdpindex)
 }
 
 /*****************************************************************************/
-int
+static int
 server_delete_os_surface(struct xrdp_mod *mod, int rdpindex)
 {
     struct xrdp_wm *wm;
@@ -5058,7 +4757,7 @@ server_delete_os_surface(struct xrdp_mod *mod, int rdpindex)
 }
 
 /*****************************************************************************/
-int
+static int
 server_paint_rect_os(struct xrdp_mod *mod, int x, int y, int cx, int cy,
                      int rdpindex, int srcx, int srcy)
 {
@@ -5091,7 +4790,7 @@ server_paint_rect_os(struct xrdp_mod *mod, int x, int y, int cx, int cy,
 }
 
 /*****************************************************************************/
-int
+static int
 server_set_hints(struct xrdp_mod *mod, int hints, int mask)
 {
     struct xrdp_wm *wm;
@@ -5114,7 +4813,7 @@ server_set_hints(struct xrdp_mod *mod, int hints, int mask)
 }
 
 /*****************************************************************************/
-int
+static int
 server_window_new_update(struct xrdp_mod *mod, int window_id,
                          struct rail_window_state_order *window_state,
                          int flags)
@@ -5127,7 +4826,7 @@ server_window_new_update(struct xrdp_mod *mod, int window_id,
 }
 
 /*****************************************************************************/
-int
+static int
 server_window_delete(struct xrdp_mod *mod, int window_id)
 {
     struct xrdp_wm *wm;
@@ -5137,7 +4836,7 @@ server_window_delete(struct xrdp_mod *mod, int window_id)
 }
 
 /*****************************************************************************/
-int
+static int
 server_window_icon(struct xrdp_mod *mod, int window_id, int cache_entry,
                    int cache_id, struct rail_icon_info *icon_info,
                    int flags)
@@ -5150,7 +4849,7 @@ server_window_icon(struct xrdp_mod *mod, int window_id, int cache_entry,
 }
 
 /*****************************************************************************/
-int
+static int
 server_window_cached_icon(struct xrdp_mod *mod,
                           int window_id, int cache_entry,
                           int cache_id, int flags)
@@ -5163,7 +4862,7 @@ server_window_cached_icon(struct xrdp_mod *mod,
 }
 
 /*****************************************************************************/
-int
+static int
 server_notify_new_update(struct xrdp_mod *mod,
                          int window_id, int notify_id,
                          struct rail_notify_state_order *notify_state,
@@ -5177,7 +4876,7 @@ server_notify_new_update(struct xrdp_mod *mod,
 }
 
 /*****************************************************************************/
-int
+static int
 server_notify_delete(struct xrdp_mod *mod, int window_id,
                      int notify_id)
 {
@@ -5188,7 +4887,7 @@ server_notify_delete(struct xrdp_mod *mod, int window_id,
 }
 
 /*****************************************************************************/
-int
+static int
 server_monitored_desktop(struct xrdp_mod *mod,
                          struct rail_monitored_desktop_order *mdo,
                          int flags)
@@ -5200,7 +4899,7 @@ server_monitored_desktop(struct xrdp_mod *mod,
 }
 
 /*****************************************************************************/
-int
+static int
 server_add_char_alpha(struct xrdp_mod *mod, int font, int character,
                       int offset, int baseline,
                       int width, int height, char *data)
@@ -5216,4 +4915,306 @@ server_add_char_alpha(struct xrdp_mod *mod, int font, int character,
     fi.bpp = 8;
     return libxrdp_orders_send_font(((struct xrdp_wm *)mod->wm)->session,
                                     &fi, font, character);
+}
+
+/*****************************************************************************/
+static int
+xrdp_mm_setup_mod1(struct xrdp_mm *self)
+{
+    void *func;
+    const char *lib;
+    char text[256];
+
+    if (self == 0)
+    {
+        return 1;
+    }
+
+    if ((lib = xrdp_mm_get_value(self, "lib")) == NULL)
+    {
+        xrdp_wm_log_msg(self->wm, LOG_LEVEL_ERROR,
+                        "no library name specified in xrdp.ini, please add "
+                        "lib=libxrdp-vnc.so or similar");
+
+        return 1;
+    }
+
+    if (lib[0] == 0)
+    {
+        xrdp_wm_log_msg(self->wm, LOG_LEVEL_ERROR,
+                        "empty library name specified in xrdp.ini, please "
+                        "add lib=libxrdp-vnc.so or similar");
+
+        return 1;
+    }
+
+    if (self->mod_handle == 0)
+    {
+        g_snprintf(text, sizeof(text), "%s/%s", XRDP_MODULE_PATH, lib);
+        /* Let the main thread load the lib,*/
+        self->mod_handle = g_xrdp_sync(xrdp_mm_sync_load, (tintptr)text, 0);
+
+        if (self->mod_handle != 0)
+        {
+            func = g_get_proc_address(self->mod_handle, "mod_init");
+
+            if (func == 0)
+            {
+                func = g_get_proc_address(self->mod_handle, "_mod_init");
+            }
+
+            if (func == 0)
+            {
+                xrdp_wm_log_msg(self->wm, LOG_LEVEL_ERROR,
+                                "error finding proc mod_init in %s, "
+                                "not a valid xrdp backend", lib);
+            }
+
+            self->mod_init = (struct xrdp_mod * ( *)(void))func;
+            func = g_get_proc_address(self->mod_handle, "mod_exit");
+
+            if (func == 0)
+            {
+                func = g_get_proc_address(self->mod_handle, "_mod_exit");
+            }
+
+            if (func == 0)
+            {
+                xrdp_wm_log_msg(self->wm, LOG_LEVEL_ERROR,
+                                "error finding proc mod_exit in %s, "
+                                "not a valid xrdp backend", lib);
+            }
+
+            self->mod_exit = (int ( *)(struct xrdp_mod *))func;
+
+            if ((self->mod_init != 0) && (self->mod_exit != 0))
+            {
+                self->mod = self->mod_init();
+
+                if (self->mod != 0)
+                {
+                    LOG(LOG_LEVEL_INFO, "loaded module '%s' ok, interface size %d, version %d", lib,
+                        self->mod->size, self->mod->version);
+                }
+            }
+            else
+            {
+                LOG(LOG_LEVEL_ERROR, "no mod_init or mod_exit address found");
+            }
+        }
+        else
+        {
+            xrdp_wm_log_msg(self->wm, LOG_LEVEL_ERROR,
+                            "error loading %s specified in xrdp.ini, please "
+                            "add a valid entry like lib=libxrdp-vnc.so or "
+                            "similar", lib);
+            return 1;
+        }
+
+        if (self->mod != 0)
+        {
+            self->mod->wm = (long)(self->wm);
+            self->mod->server_begin_update = server_begin_update;
+            self->mod->server_end_update = server_end_update;
+            self->mod->server_bell_trigger = server_bell_trigger;
+            self->mod->server_chansrv_in_use = server_chansrv_in_use;
+            self->mod->server_init_xkb_layout = server_init_xkb_layout;
+            self->mod->server_fill_rect = server_fill_rect;
+            self->mod->server_screen_blt = server_screen_blt;
+            self->mod->server_paint_rect = server_paint_rect;
+            self->mod->server_set_pointer = server_set_pointer;
+            self->mod->server_set_pointer_ex = server_set_pointer_ex;
+            self->mod->server_palette = server_palette;
+            self->mod->server_msg = server_msg;
+            self->mod->server_is_term = g_is_term;
+            self->mod->server_set_clip = server_set_clip;
+            self->mod->server_reset_clip = server_reset_clip;
+            self->mod->server_set_fgcolor = server_set_fgcolor;
+            self->mod->server_set_bgcolor = server_set_bgcolor;
+            self->mod->server_set_opcode = server_set_opcode;
+            self->mod->server_set_mixmode = server_set_mixmode;
+            self->mod->server_set_brush = server_set_brush;
+            self->mod->server_set_pen = server_set_pen;
+            self->mod->server_draw_line = server_draw_line;
+            self->mod->server_add_char = server_add_char;
+            self->mod->server_draw_text = server_draw_text;
+            self->mod->client_monitor_resize = client_monitor_resize;
+            self->mod->server_monitor_resize_done = server_monitor_resize_done;
+            self->mod->server_get_channel_count = server_get_channel_count;
+            self->mod->server_query_channel = server_query_channel;
+            self->mod->server_get_channel_id = server_get_channel_id;
+            self->mod->server_send_to_channel = server_send_to_channel;
+            self->mod->server_create_os_surface = server_create_os_surface;
+            self->mod->server_switch_os_surface = server_switch_os_surface;
+            self->mod->server_delete_os_surface = server_delete_os_surface;
+            self->mod->server_paint_rect_os = server_paint_rect_os;
+            self->mod->server_set_hints = server_set_hints;
+            self->mod->server_window_new_update = server_window_new_update;
+            self->mod->server_window_delete = server_window_delete;
+            self->mod->server_window_icon = server_window_icon;
+            self->mod->server_window_cached_icon = server_window_cached_icon;
+            self->mod->server_notify_new_update = server_notify_new_update;
+            self->mod->server_notify_delete = server_notify_delete;
+            self->mod->server_monitored_desktop = server_monitored_desktop;
+            self->mod->server_add_char_alpha = server_add_char_alpha;
+            self->mod->server_create_os_surface_bpp = server_create_os_surface_bpp;
+            self->mod->server_paint_rect_bpp = server_paint_rect_bpp;
+            self->mod->server_composite = server_composite;
+            self->mod->server_paint_rects = server_paint_rects;
+            self->mod->server_session_info = server_session_info;
+            self->mod->server_egfx_cmd = server_egfx_cmd;
+            self->mod->server_set_pointer_large = server_set_pointer_large;
+            self->mod->server_paint_rects_ex = server_paint_rects_ex;
+            self->mod->server_set_pointer_system = server_set_pointer_system;
+            self->mod->si = &(self->wm->session->si);
+        }
+    }
+
+    /* id self->mod is null, there must be a problem */
+    if (self->mod == 0)
+    {
+        LOG(LOG_LEVEL_ERROR, "problem loading lib in xrdp_mm_setup_mod1");
+        return 1;
+    }
+
+    return 0;
+}
+
+/*****************************************************************************/
+static int
+xrdp_mm_setup_mod2(struct xrdp_mm *self)
+{
+    char text[256];
+    const char *name;
+    const char *value;
+    int i;
+    int rv;
+    int key_flags;
+    int device_flags;
+
+    rv = 1; /* failure */
+    g_memset(text, 0, sizeof(text));
+
+    if (!g_is_wait_obj_set(self->wm->pro_layer->self_term_event))
+    {
+        if (self->mod->mod_start(self->mod, self->wm->screen->width,
+                                 self->wm->screen->height,
+                                 self->wm->screen->bpp) != 0)
+        {
+            g_set_wait_obj(self->wm->pro_layer->self_term_event); /* kill session */
+        }
+    }
+
+    if (!g_is_wait_obj_set(self->wm->pro_layer->self_term_event))
+    {
+        if (self->display > 0)
+        {
+            if (self->code == XVNC_SESSION_CODE)
+            {
+                g_snprintf(text, sizeof(text), "%d", 5900 + self->display);
+            }
+            else if (self->code == XORG_SESSION_CODE ||
+                     self->code == XVNC_UDS_SESSION_CODE)
+            {
+                g_snprintf(text, sizeof(text), XRDP_X11RDP_STR,
+                           self->uid, self->display);
+            }
+            else
+            {
+                g_set_wait_obj(self->wm->pro_layer->self_term_event); /* kill session */
+            }
+        }
+    }
+
+    if (!g_is_wait_obj_set(self->wm->pro_layer->self_term_event))
+    {
+        /* this adds the port to the end of the list, it will already be in
+           the list as -1
+           the module should use the last one */
+        if (g_strlen(text) > 0)
+        {
+            list_add_strdup(self->login_names, "port");
+            list_add_strdup(self->login_values, text);
+        }
+
+        /* always set these */
+
+        self->mod->mod_set_param(self->mod, "client_info",
+                                 (const char *) (self->wm->session->client_info));
+
+        name = self->wm->session->client_info->hostname;
+        self->mod->mod_set_param(self->mod, "hostname", name);
+        g_snprintf(text, 255, "%d", self->wm->session->client_info->keylayout);
+        self->mod->mod_set_param(self->mod, "keylayout", text);
+        if (guid_is_set(&self->guid))
+        {
+            self->mod->mod_set_param(self->mod, "guid", (char *) &self->guid);
+        }
+
+        for (i = 0; i < self->login_names->count; i++)
+        {
+            name = (const char *) list_get_item(self->login_names, i);
+            value = (const char *) list_get_item(self->login_values, i);
+            self->mod->mod_set_param(self->mod, name, value);
+        }
+
+        /* connect */
+        if (self->mod->mod_connect(self->mod) == 0)
+        {
+            rv = 0; /* connect success */
+
+            // If we've received a recent TS_SYNC_EVENT, pass it on to
+            // the module so (e.g.) NumLock starts in the right state.
+            if (self->last_sync_saved)
+            {
+                int key_flags = self->last_sync_key_flags;
+                int device_flags = self->last_sync_device_flags;
+                self->last_sync_saved = 0;
+                self->mod->mod_event(self->mod, WM_KEYBRD_SYNC, key_flags,
+                                     device_flags, key_flags, device_flags);
+
+            }
+        }
+        else
+        {
+            xrdp_wm_show_log(self->wm);
+            if (self->wm->hide_log_window)
+            {
+                rv = 1;
+            }
+        }
+    }
+
+    if (rv == 0)
+    {
+        /* sync modifiers */
+        key_flags = 0;
+        device_flags = 0;
+
+        if (self->wm->scroll_lock)
+        {
+            key_flags |= 1;
+        }
+
+        if (self->wm->num_lock)
+        {
+            key_flags |= 2;
+        }
+
+        if (self->wm->caps_lock)
+        {
+            key_flags |= 4;
+        }
+
+        if (self->mod != 0)
+        {
+            if (self->mod->mod_event != 0)
+            {
+                self->mod->mod_event(self->mod, WM_KEYBRD_SYNC, key_flags,
+                                     device_flags, key_flags, device_flags);
+            }
+        }
+    }
+
+    return rv;
 }
