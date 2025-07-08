@@ -61,6 +61,7 @@ test_xrdp_LDADD = \
     $(top_builddir)/libxrdp/libxrdp.la \
     $(top_builddir)/xrdp/lang.o \
     $(top_builddir)/xrdp/xrdp_mm.o \
+    $(top_builddir)/xrdp/xrdp_mm_ccp.o \
     $(top_builddir)/xrdp/xrdp_wm.o \
     $(top_builddir)/xrdp/xrdp_font.o \
     $(top_builddir)/xrdp/xrdp_egfx.o \

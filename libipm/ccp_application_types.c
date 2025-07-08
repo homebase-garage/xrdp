@@ -43,6 +43,8 @@ ccp_close_reason_to_str(enum ccp_close_reason_type n,
         ? "Another connection was made to the session" :
         (n == CCP_CLOSE_LOGOFF_BY_USER)
         ? "The user logged out of the session" :
+        (n == CCP_CLOSE_SOFTWARE_FAILURE)
+        ? "A software failure has occurred" :
         /* Default */ NULL;
 
     if (str == NULL)

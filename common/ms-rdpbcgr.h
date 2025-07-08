@@ -82,6 +82,7 @@
 #define RNS_UD_32BPP_SUPPORT 0x0008
 
 /* Client Core Data: earlyCapabilityFlags (2.2.1.3.2) */
+#define RNS_UD_CS_SUPPORT_ERRINFO_PDU        0x0001
 #define RNS_UD_CS_WANT_32BPP_SESSION         0x0002
 #define RNS_UD_CS_SUPPORT_MONITOR_LAYOUT_PDU 0x0040
 #define RNS_UD_CS_SUPPORT_DYNVC_GFX_PROTOCOL 0x0100
@@ -280,7 +281,10 @@
 #define ERRINFO_DISCONNECTED_BY_OTHERCONNECTION       0x0005
 #define ERRINFO_OUT_OF_MEMORY                         0x0006
 #define ERRINFO_SERVER_DENIED_CONNECTION              0x0007
+#define ERRINFO_SERVER_INSUFFICIENT_PRIVILEGES        0x0009
 #define ERRINFO_LOGOFF_BY_USER                        0x000c
+#define ERRINFO_SERVER_DWM_CRASH                      0x0010
+#define ERRINFO_SERVER_CSRSS_CRASH                    0x0018
 
 /* Virtual channel PDU (2.2.6.1) */
 #define CHANNEL_CHUNK_LENGTH                          1600

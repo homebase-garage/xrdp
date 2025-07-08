@@ -457,6 +457,18 @@ int
 xrdp_rdp_send_session_info(struct xrdp_rdp *self, const char *data,
                            int data_bytes);
 /**
+ * Send a [MS-RDPBCGR] TS_SET_ERROR_INFO_PDU message
+ * @param self xrdp_rdp struct
+ * @param reason errinfo code ([MS-RDPBCGR] 2.2.5.1.1)
+ * @return != 0 for error
+
+ * The caller is responsible for checking the client supports
+ * reception of this message (see 2.2.5.1)
+ */
+int
+xrdp_rdp_send_set_error(struct xrdp_rdp *self, int reason);
+
+/**
  * Request output suppress or resume
  *
  * @param self RDP struct

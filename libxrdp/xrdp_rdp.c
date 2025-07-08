@@ -1364,11 +1364,9 @@ xrdp_rdp_send_disconnect_query_response(struct xrdp_rdp *self)
     return 0;
 }
 
-#if 0 /* not used */
 /*****************************************************************************/
-/* Send a [MS-RDPBCGR] TS_SET_ERROR_INFO_PDU message */
-static int
-xrdp_rdp_send_disconnect_reason(struct xrdp_rdp *self, int reason)
+int
+xrdp_rdp_send_set_error(struct xrdp_rdp *self, int reason)
 {
     struct stream *s;
 
@@ -1378,7 +1376,7 @@ xrdp_rdp_send_disconnect_reason(struct xrdp_rdp *self, int reason)
     if (xrdp_rdp_init_data(self, s) != 0)
     {
         LOG(LOG_LEVEL_ERROR,
-            "xrdp_rdp_send_disconnect_reason: xrdp_rdp_init_data failed");
+            "xrdp_rdp_send_set_error_pdu: xrdp_rdp_init_data failed");
         free_stream(s);
         return 1;
     }
@@ -1399,7 +1397,6 @@ xrdp_rdp_send_disconnect_reason(struct xrdp_rdp *self, int reason)
     free_stream(s);
     return 0;
 }
-#endif
 
 /*****************************************************************************/
 /* Process a [MS-RDPRFX] TS_FRAME_ACKNOWLEDGE_PDU message */

@@ -104,8 +104,18 @@ struct xrdp_session *
 libxrdp_init(tbus id, struct trans *trans, const char *xrdp_ini);
 int
 libxrdp_exit(struct xrdp_session *session);
+/**
+ * Sends a disconnect sequence from the server ([MS-RDPBCGR] 1.3.1.4.x)
+ * @param session xrdp session
+ * @param errinfo Reason ([MS-RDPBCGR] 2.2.5.1.1)
+ * @return != 0 for an error
+ *
+ * After this call, the rdp channel is closed and cannot be re-used. This
+ * routine can be called more than once, but only the first call is
+ * effective.
+ */
 int
-libxrdp_disconnect(struct xrdp_session *session);
+libxrdp_disconnect(struct xrdp_session *session, int errinfo);
 int
 libxrdp_process_incoming(struct xrdp_session *session);
 int EXPORT_CC
