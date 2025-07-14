@@ -29,6 +29,8 @@
 
 #include <sys/types.h>
 
+#include "ccp_application_types.h"
+
 struct config_sesman;
 struct trans;
 struct login_info;
@@ -39,15 +41,70 @@ struct session_data;
 #endif
 
 /* Globals */
+/**
+ * Pointer to config data for sesman/sesexec
+ */
 extern struct config_sesman *g_cfg;
+
+/**
+ * DES key used to obfuscate VNC password files.
+ *
+ * This key is not documented in RFC6143, but can readily be found by
+ * searching VNC sources.
+ *
+ * You can also find the 'reversed' form "e84ad660c4721ae0"
+ * on the net, particulary for openssl one-liners to decrypt VNC
+ * password files.
+ */
 extern unsigned char g_fixedkey[8];
+
+/**
+ * Information about the logged-in user
+ *
+ * This is set when the user successfully passes authentication
+ */
 extern struct login_info *g_login_info;
+
+/**
+ * Information about the user session (opaque type)
+ *
+ * Set when the user is succesfully logged in
+ */
 extern struct session_data *g_session_data;
 
+/**
+ * Program has received a termination event
+ */
 extern tintptr g_term_event;
+
+/**
+ * Program has received one or more SIGCHLD events
+ */
 extern tintptr g_sigchld_event;
+
+/**
+ * PID of sesexec process
+ *
+ * Used to detect when we are running in a form of the original process
+ */
 extern pid_t g_pid;
 
+/**
+ * EICP/ERCP transport
+ *
+ * Used to communicate with the sesman process
+ *
+ * Use sesexec_is_ecp_active() if you need to check sesman is
+ * truly there.
+ */
+extern struct trans *g_ecp_trans;
+
+/**
+ * CCP transport
+ *
+ * Used to communicate with the currently connected xrdp process
+ */
+extern struct trans *g_ccp_trans;
 
 /**
  * Callback to process incoming ERCP data
@@ -55,14 +112,18 @@ extern pid_t g_pid;
 int
 sesexec_ercp_data_in(struct trans *self);
 
-/*
+/**
  * Check for termination
+ *
+ * @return boolean. Set if program has been asked to terminate
  */
 int
 sesexec_is_term(void);
 
-/*
+/**
  * Terminate the sesexec main loop
+ *
+ * @param status Status to return to the OS
  */
 void
 sesexec_terminate_main_loop(int status);
@@ -79,12 +140,35 @@ sesexec_terminate_main_loop(int status);
 int
 sesexec_set_ecp_transport(struct trans *t);
 
-/*
+/**
  * Is the ECP transport still active?
  *
  * @result boolean
+ *
+ * This is intended to be used as a guard to prevent an active ECP
+ * transport being overwritten. Do not use it to check if sesman is
+ * active before sending messages, as this introduces a race condition.
  */
 int
 sesexec_is_ecp_active(void);
+
+/**
+ * Terminate an active xrdp process
+ *
+ * @param Reason to pass back to the xrdp process (if connected)
+ *
+ * After this call, g_ccp_trans will be NULL
+ */
+void
+sesexec_terminate_connected_xrdp_process(enum ccp_close_reason_type reason);
+
+/**
+ * Set the CCP transport from an SCP transport
+ *
+ * This call is intended to be used at the end of a connection
+ * event, to record our end of the connection to the xrdp process
+ */
+int
+sesexec_set_ccp_trans(struct trans *scp_trans);
 
 #endif // SESEXEC_H

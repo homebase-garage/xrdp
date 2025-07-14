@@ -32,6 +32,8 @@
 #include <stdarg.h>
 
 #include "arch.h"
+#include "ccp.h"
+#include "ccp_server.h"
 #include "eicp.h"
 #include "eicp_server.h"
 #include "ercp.h"
@@ -52,6 +54,12 @@ struct startup_params
     const char *sesman_ini;
 };
 
+enum
+{
+    MAX_ROBJS = 32, ///< Maximum number of file objects in use at any one time
+    XRDP_EXIT_TIMEOUT = 2500 ///< Time to wait for xrdp process to exit
+};
+
 /*
  * Program-scope globals
  */
@@ -64,10 +72,12 @@ tintptr g_term_event = 0;
 tintptr g_sigchld_event = 0;
 pid_t g_pid;
 
+struct trans *g_ecp_trans;
+struct trans *g_ccp_trans;
+
 /*
  * Module-scope globals
  */
-static struct trans *g_ecp_trans;
 static pid_t g_ecp_pid;
 static int g_terminate_loop = 0;
 static int g_terminate_status = 0;
@@ -164,6 +174,27 @@ sesexec_ercp_data_in(struct trans *self)
 }
 
 /******************************************************************************/
+static int
+sesexec_ccp_data_in(struct trans *self)
+{
+    int rv;
+    int available;
+
+    rv = ccp_msg_in_check_available(self, &available);
+
+    if (rv == 0 && available)
+    {
+        if ((rv = ccp_server(self)) != 0)
+        {
+            LOG(LOG_LEVEL_ERROR, "%s: ccp_server failed", __func__);
+        }
+        ccp_msg_in_reset(self);
+    }
+
+    return rv;
+}
+
+/******************************************************************************/
 /**
  * Informs the main loop a termination signal has been received
  */
@@ -235,6 +266,12 @@ sesexec_set_ecp_transport(struct trans *t)
         g_ecp_pid = 0;
         rv = 0;
     }
+    else if (t == g_ecp_trans)
+    {
+        // This would break the memory subsystem!
+        LOG(LOG_LEVEL_ERROR, "%s: programming error", __func__);
+        rv = 1;
+    }
     else if ((rv = g_sck_get_peer_cred(t->sck, &pid, &uid, &gid)) != 0)
     {
         LOG(LOG_LEVEL_ERROR, "Can't get credentials of sesman socket [%s]",
@@ -288,6 +325,19 @@ sesexec_main_loop_cleanup(void)
 
 /******************************************************************************/
 /**
+ * Close the CCP trans unconditionally
+ *
+ * Use this call if you are certain the other end has gone away
+ */
+static void
+close_ccp_trans(void)
+{
+    trans_delete(g_ccp_trans);
+    g_ccp_trans = NULL;
+}
+
+/******************************************************************************/
+/**
  *
  * @brief Starts sesexec main loop
  *
@@ -297,7 +347,6 @@ sesexec_main_loop(void)
 {
     int error = 0;
     int robjs_count;
-#define MAX_ROBJS 32
     intptr_t robjs[MAX_ROBJS];
 
     g_terminate_loop = 0;
@@ -318,6 +367,19 @@ sesexec_main_loop(void)
             {
                 LOG(LOG_LEVEL_ERROR, "sesexec_main_loop: "
                     "trans_get_wait_objs(ECP) failed");
+                sesexec_terminate_main_loop(error);
+                continue;
+            }
+        }
+
+        // CCP transport is set if we have an xrdp connection
+        if (g_ccp_trans != NULL)
+        {
+            error = trans_get_wait_objs(g_ccp_trans, robjs, &robjs_count);
+            if (error != 0)
+            {
+                LOG(LOG_LEVEL_ERROR, "sesexec_main_loop: "
+                    "trans_get_wait_objs(CCP) failed");
                 sesexec_terminate_main_loop(error);
                 continue;
             }
@@ -370,12 +432,15 @@ sesexec_main_loop(void)
             session_process_sigchld_event(g_session_data);
             if (session_was_active && !session_active(g_session_data))
             {
-                // We've finished the session. Tell sesman and
+                // We've finished the session. Tell sesman, xrdp and
                 // finish up.
                 if (g_ecp_trans != NULL)
                 {
                     (void)ercp_send_session_finished_event(g_ecp_trans);
                 }
+
+                sesexec_terminate_connected_xrdp_process(
+                    CCP_CLOSE_LOGOFF_BY_USER);
 
                 session_data_free(g_session_data);
                 g_session_data = NULL;
@@ -411,6 +476,33 @@ sesexec_main_loop(void)
             }
         }
 
+        if (g_ccp_trans != NULL)
+        {
+            error = trans_check_wait_objs(g_ccp_trans);
+            if (error != 0)
+            {
+                if (g_ccp_trans->status != TRANS_STATUS_UP)
+                {
+                    // xrdp has gone away.
+                    LOG(LOG_LEVEL_INFO, "sesexec_main_loop: "
+                        "xrdp has exited");
+                    // TODO: Tell sesman xrdp has exited
+                    close_ccp_trans();
+                }
+                else
+                {
+                    // A callback has failed. This shouldn't really happen.
+                    // Try to signal a software failure to the xrdp process
+                    LOG(LOG_LEVEL_ERROR, "sesexec_main_loop: "
+                        "trans_check_wait_objs failed for CCP transport");
+                    sesexec_terminate_connected_xrdp_process(
+                        CCP_CLOSE_SOFTWARE_FAILURE);
+
+                }
+                continue;
+            }
+        }
+
         error = sesexec_discover_check_wait_objs();
         if (error != 0)
         {
@@ -419,14 +511,16 @@ sesexec_main_loop(void)
             sesexec_terminate_main_loop(error);
             continue;
         }
-
     }
 
     /* close sesman communications immediately */
     sesexec_set_ecp_transport(NULL);
 
+    /* We should already have notified xrdp of the reason why we are
+     * closing, in which case this call has no effect */
+    sesexec_terminate_connected_xrdp_process(CCP_CLOSE_SOFTWARE_FAILURE);
+
     return g_terminate_status;
-#undef MAX_ROBJS
 }
 
 /******************************************************************************/
@@ -597,4 +691,98 @@ main(int argc, char **argv)
 
     g_deinit();
     return error;
+}
+
+/******************************************************************************/
+void
+sesexec_terminate_connected_xrdp_process(enum ccp_close_reason_type reason)
+{
+    if (g_ccp_trans != NULL && g_ccp_trans->status == TRANS_STATUS_UP)
+    {
+        // Ask xrdp to exit, specifying the reason to return to
+        // the RDP client (if possible)
+        (void)ccp_send_close_connection_request(g_ccp_trans, reason);
+
+        unsigned int start_ms = g_get_elapsed_ms();
+        while (1)
+        {
+            int robjs_count = 0;
+            intptr_t robjs[MAX_ROBJS];
+
+            // How long have we been waiting for xrdp to exit?
+            unsigned int elapsed = g_get_elapsed_ms() - start_ms;
+            if (elapsed > XRDP_EXIT_TIMEOUT)
+            {
+                // A timeout has occurred
+                LOG(LOG_LEVEL_WARNING,
+                    "xrdp process failed to exit after %u ms", elapsed);
+                break;
+            }
+
+            robjs[robjs_count++] = g_term_event;
+            if (trans_get_wait_objs(g_ccp_trans, robjs, &robjs_count) != 0)
+            {
+                // Transport has gone away
+                LOG(LOG_LEVEL_WARNING,
+                    "xrdp process exited after %u ms", elapsed);
+                break;
+            }
+            if (g_obj_wait(robjs, robjs_count, NULL, 0,
+                           XRDP_EXIT_TIMEOUT - elapsed) != 0)
+            {
+                /* should not get here */
+                g_sleep(100);
+            }
+            else if (g_is_wait_obj_set(g_term_event))
+            {
+                // Get out as quickly as possible
+                break;
+            }
+            else
+            {
+                // This will cause trans_get_wait_objs() to return a failure
+                // when the end of the data on the socket is reached.
+                (void)trans_check_wait_objs(g_ccp_trans);
+            }
+        }
+    }
+
+    close_ccp_trans();
+}
+
+/******************************************************************************/
+int
+sesexec_set_ccp_trans(struct trans *scp_trans)
+{
+    int rv = 1;
+    pid_t pid;
+
+    if (scp_trans == NULL)
+    {
+        close_ccp_trans();
+        rv = 0;
+    }
+    else if (scp_trans == g_ccp_trans)
+    {
+        // This would break the memory subsystem!
+        LOG(LOG_LEVEL_ERROR, "%s: programming error", __func__);
+        rv = 1;
+    }
+    else if ((rv = g_sck_get_peer_cred(scp_trans->sck, &pid, NULL, NULL)) != 0)
+    {
+        LOG(LOG_LEVEL_ERROR, "Can't get credentials of xrdp socket [%s]",
+            g_get_strerror());
+    }
+    else
+    {
+        // Convert the transport to a CCP transport
+        ccp_trans_from_scp_trans(scp_trans,
+                                 sesexec_ccp_data_in,
+                                 NULL);
+        trans_delete(g_ccp_trans);
+        g_ccp_trans = scp_trans;
+        rv = 0;
+    }
+
+    return rv;
 }

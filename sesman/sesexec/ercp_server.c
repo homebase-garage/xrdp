@@ -87,15 +87,33 @@ handle_connect_session_request(struct trans *self)
         }
         else
         {
-            scp_fd = -1; // Don't close this twice!
+            // Ownership of the file descriptor is passed to scp_trans;
+            // don't delete it separately.
+            scp_fd = -1;
 
             // Now we've got a transport we can send data back to
             // the SCP client
             enum scp_sconnect_status scp_status;
             int display_fd = -1;
             int chan_fd = -1;
+
+            // Terminate any existing xrdp process to sesexec
+            if (g_ccp_trans != NULL)
+            {
+                sesexec_terminate_connected_xrdp_process(
+                    CCP_CLOSE_DISCONNECTED_BY_OTHERCONNECTION);
+                g_sleep(500);
+            }
             scp_status = get_session_fds(g_session_data, scp_flags,
                                          &display_fd, &chan_fd);
+
+            // Tell sesman about the new client connection
+            if (g_ecp_trans != NULL)
+            {
+                /// TODO: client connect event
+            }
+
+            // Pass the session file descriptors to the client
             rv = scp_send_connect_session_response(scp_trans, scp_status,
                                                    display_fd, chan_fd);
 
@@ -120,10 +138,17 @@ handle_connect_session_request(struct trans *self)
                     session_run_reconnect_script(g_login_info,
                                                  g_session_data);
                 }
+
+                // Convert the SCP transport to a CCP transport, and
+                // record it
+                if (sesexec_set_ccp_trans(scp_trans) == 0)
+                {
+                    scp_trans = NULL; // Prevent transport being deleted.
+                }
             }
 
-            // Regardless of the result of the send, we must close all
-            // our copies of file descriptors.
+            // Close all our copies of file descriptors, including the
+            // SCP transport if we failed to convert it to a CCP transport
             if (display_fd >= 0)
             {
                 g_file_close(display_fd);
@@ -132,7 +157,10 @@ handle_connect_session_request(struct trans *self)
             {
                 g_file_close(chan_fd);
             }
-            trans_delete(scp_trans);
+            if (scp_trans != NULL)
+            {
+                trans_delete(scp_trans);
+            }
         }
     }
 
