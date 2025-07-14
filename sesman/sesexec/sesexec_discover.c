@@ -83,7 +83,7 @@ discover_trans_conn_in(struct trans *trans, struct trans *new_trans)
         // session
         ercp_init_trans(new_trans);
         new_trans->trans_data_in = sesexec_ercp_data_in;
-        new_trans->callback_data = (void *)new_trans;
+        new_trans->callback_data = NULL;
 
         // Note, this call makes further privilege checks that may still
         // fail.  If they do however, we wish to carry on running. These

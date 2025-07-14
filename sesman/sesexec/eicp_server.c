@@ -172,9 +172,7 @@ handle_create_session_request(struct trans *self)
         if (status == 0 && scp_status == E_SCP_SCREATE_OK)
         {
             // Further comms to sesman is sent over the ERCP protocol
-            ercp_trans_from_eicp_trans(self,
-                                       sesexec_ercp_data_in,
-                                       (void *)self);
+            ercp_trans_from_eicp_trans(self, sesexec_ercp_data_in, NULL);
 
             // Announce the session to sesman
             if ((status = ercp_send_session_announce_event(
