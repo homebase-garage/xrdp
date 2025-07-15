@@ -86,7 +86,8 @@ struct scp_list_item
     char start_ip_addr[MAX_PEER_ADDRSTRLEN];
     int is_admin;
     int create_session_in_progress; ///< Already handling a create_session
-    unsigned int session_display;  ///< Display allocated for create_session
+    /// Display allocated for session. This is always valid (>= 0)
+    unsigned int session_display;
 };
 
 

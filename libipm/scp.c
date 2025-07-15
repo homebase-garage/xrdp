@@ -608,6 +608,58 @@ scp_send_connect_session_response(struct trans *trans,
 }
 
 /*****************************************************************************/
+/**
+ * Helper function to get the file descriptors for a connect
+ *
+ * @param trans SCP trans
+ * @param[out] display_fd Display server file descriptor
+ * @param[out] chan_fd Chansrv file descriptor
+ * @return != 0 for error
+ *
+ * This wrapper is nneded as libipm doesn't currently guarantee to
+ * handle received file descriptors well if an error is encountered
+ * mid-message.
+ *
+ * If an error is returned, some file descriptors may be valid.
+ */
+static int
+get_connect_session_response_fds(struct trans *trans,
+                                 int *display_fd,
+                                 int *chan_fd)
+{
+    int rv;
+    int fd_present;
+
+    // Read the display server file descriptor and guard
+    if ((rv = libipm_msg_in_parse(trans, "b", &fd_present)) != 0)
+    {
+        return rv;
+    }
+    if (fd_present)
+    {
+        if ((rv = libipm_msg_in_parse(trans, "h", display_fd)) != 0)
+        {
+            return rv;
+        }
+    }
+
+    // Read the chansrv file descriptor and guard
+    if ((rv = libipm_msg_in_parse(trans, "b", &fd_present)) != 0)
+    {
+        return rv;
+    }
+    if (fd_present)
+    {
+        if ((rv = libipm_msg_in_parse(trans, "h", chan_fd)) != 0)
+        {
+            return rv;
+        }
+    }
+
+    return 0;
+}
+
+/*****************************************************************************/
 
 int
 scp_get_connect_session_response(struct trans *trans,
@@ -615,57 +667,38 @@ scp_get_connect_session_response(struct trans *trans,
                                  int *display_fd,
                                  int *chan_fd)
 {
-    int fd_present;
-    int got_display_fd = 0;
-    int got_chan_fd = 0;
-
+    int rv;
     /* Intermediate values */
     int32_t i_status;
-    int rv = libipm_msg_in_parse( trans, "i", &i_status);
 
-    // Read the X11 file descriptor
-    if (rv == 0 && libipm_msg_in_parse(trans, "b", &fd_present) == 0)
+    /* Set the returned FDs to nonsensical values to stop valid
+     * FDs getting clobbered */
+    *display_fd = -1;
+    *chan_fd = -1;
+
+    if ((rv = libipm_msg_in_parse( trans, "i", &i_status)) == 0)
     {
-        if (!fd_present)
+        // Us a helper function to get the file descriptors as this
+        // makes flow control easier.
+        rv = get_connect_session_response_fds(trans, display_fd, chan_fd);
+        if (rv == 0)
         {
-            // Caller didn't send display_fd
-            *display_fd = -1;
+            *status = (enum scp_sconnect_status)i_status;
         }
         else
         {
-            got_display_fd = (libipm_msg_in_parse(trans, "h", display_fd) == 0);
+            // Close any fds we did receive to stop leaks
+            if (*display_fd >= 0)
+            {
+                g_file_close(*display_fd);
+                *display_fd = -1;
+            }
+            if (*chan_fd >= 0)
+            {
+                g_file_close(*chan_fd);
+                *chan_fd = -1;
+            }
         }
-    }
-
-    // Read the chansrv file descriptor
-    if (rv == 0 && libipm_msg_in_parse(trans, "b", &fd_present) == 0)
-    {
-        if (!fd_present)
-        {
-            // Caller didn't send chan_fd
-            *chan_fd = -1;
-        }
-        else
-        {
-            got_chan_fd = (libipm_msg_in_parse(trans, "h", chan_fd) == 0);
-        }
-    }
-
-    // If we've failed, close any file descriptors we've parsed so far
-    if (rv != 0)
-    {
-        if (got_display_fd)
-        {
-            g_file_close(*display_fd);
-        }
-        if (got_chan_fd)
-        {
-            g_file_close(*chan_fd);
-        }
-    }
-    else
-    {
-        *status = (enum scp_sconnect_status)i_status;
     }
 
     return rv;

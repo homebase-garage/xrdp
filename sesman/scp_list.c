@@ -273,8 +273,7 @@ scp_list_get_create_session_displays(struct set_int *alloc_displays)
         sli = (struct scp_list_item *)list_get_item(g_scp_list, i);
 
         if (SCP_LIST_ITEM_IN_USE(sli) &&
-                sli->create_session_in_progress &&
-                sli->session_display >= 0)
+                sli->create_session_in_progress)
         {
             set_int_add(alloc_displays, sli->session_display);
         }
