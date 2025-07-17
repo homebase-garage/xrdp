@@ -5342,8 +5342,8 @@ xrdp_mm_setup_mod2(struct xrdp_mm *self)
         self->mod->mod_set_param(self->mod, "client_info",
                                  (const char *) (self->wm->session->client_info));
 
-        name = self->wm->session->client_info->hostname;
-        self->mod->mod_set_param(self->mod, "hostname", name);
+        name = self->wm->session->client_info->client_name;
+        self->mod->mod_set_param(self->mod, "client_name", name);
         g_snprintf(text, 255, "%d", self->wm->session->client_info->keylayout);
         self->mod->mod_set_param(self->mod, "keylayout", text);
         if (guid_is_set(&self->guid))

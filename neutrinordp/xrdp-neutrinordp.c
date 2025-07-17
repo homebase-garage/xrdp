@@ -611,7 +611,7 @@ lxrdp_set_param(struct mod *mod, const char *name, const char *value)
 
     settings = mod->inst->settings;
 
-    if (g_strcmp(name, "hostname") == 0)
+    if (g_strcmp(name, "client_name") == 0)
     {
     }
     else if (g_strcmp(name, "ip") == 0)

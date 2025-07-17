@@ -1477,7 +1477,7 @@ xrdp_sec_process_mcs_data_CS_CORE(struct xrdp_sec *self, struct stream *s)
      2 + 2 +        /* desktopWidth + desktopHeight */ \
      2 + 2 +        /* colorDepth + SASSequence */ \
      4 +            /* keyboardLayout */ \
-     4 + INFO_CLIENT_NAME_BYTES + /* clientBuild + clientName */ \
+     4 + INFO_CLIENT_NAME_BYTES_UTF16 + /* clientBuild + clientName */ \
      4 + 4 + 4 +    /* keyboardType + keyboardSubType + keyboardFunctionKey */ \
      64 +           /* imeFileName */ \
      0)
@@ -1523,12 +1523,12 @@ xrdp_sec_process_mcs_data_CS_CORE(struct xrdp_sec *self, struct stream *s)
      * This should be null-terminated. Allow for the possibility it
      * isn't by ignoring the last two bytes and treating them as a
      * terminator anyway */
-    in_utf16_le_fixed_as_utf8(s, (INFO_CLIENT_NAME_BYTES - 2) / 2,
-                              client_info->hostname,
-                              sizeof(client_info->hostname));
+    in_utf16_le_fixed_as_utf8(s, (INFO_CLIENT_NAME_BYTES_UTF16 - 2) / 2,
+                              client_info->client_name,
+                              sizeof(client_info->client_name));
     in_uint8s(s, 2); /* See above */
     LOG(LOG_LEVEL_INFO, "Connected client computer name: %s",
-        client_info->hostname);
+        client_info->client_name);
     in_uint32_le(s, client_info->keyboard_type); /* [MS-RDPBCGR] TS_UD_CS_CORE keyboardType */
     in_uint32_le(s, client_info->keyboard_subtype); /* [MS-RDPBCGR] TS_UD_CS_CORE keyboardSubType */
     in_uint8s(s, 4); /* keyboardFunctionKey */
@@ -1548,7 +1548,7 @@ xrdp_sec_process_mcs_data_CS_CORE(struct xrdp_sec *self, struct stream *s)
                "unknown"),
               client_info->keylayout,
               client_info->build,
-              client_info->hostname,
+              client_info->client_name,
               client_info->keyboard_type,
               client_info->keyboard_subtype);
 
