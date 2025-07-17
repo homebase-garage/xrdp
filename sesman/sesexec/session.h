@@ -32,7 +32,6 @@
 
 #include "guid.h"
 #include "scp_application_types.h"
-#include "xrdp_constants.h"
 
 struct login_info;
 struct proc_exit_status;
