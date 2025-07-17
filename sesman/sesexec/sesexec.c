@@ -74,6 +74,9 @@ pid_t g_pid;
 
 struct trans *g_ecp_trans;
 struct trans *g_ccp_trans;
+char g_client_ip[MAX_PEER_ADDRSTRLEN];
+char g_client_name[INFO_CLIENT_NAME_BYTES_UTF8];
+time_t g_last_connect_disconnect;
 
 /*
  * Module-scope globals
@@ -486,7 +489,17 @@ sesexec_main_loop(void)
                     // xrdp has gone away.
                     LOG(LOG_LEVEL_INFO, "sesexec_main_loop: "
                         "xrdp has exited");
-                    // TODO: Tell sesman xrdp has exited
+
+                    g_client_ip[0] = '\0';
+                    g_client_name[0] = '\0';
+                    g_last_connect_disconnect = time(NULL);
+
+                    if (g_ecp_trans != NULL)
+                    {
+                        (void)ercp_send_client_disconnect_event(
+                            g_ecp_trans, g_last_connect_disconnect);
+
+                    }
                     close_ccp_trans();
                 }
                 else

@@ -92,6 +92,51 @@ process_session_finished_event(struct session_item *si)
 }
 
 /******************************************************************************/
+static int
+process_client_connect_event(struct session_item *si)
+{
+    int rv;
+    const char *client_ip;
+    const char *client_name;
+    time_t connect_time;
+
+    rv = ercp_get_client_connect_event(si->sesexec_trans,
+                                       &client_ip, &client_name, &connect_time);
+    if (rv == 0)
+    {
+        strlcpy(si->client_ip, client_ip, sizeof(si->client_ip));
+        strlcpy(si->client_name, client_name, sizeof(si->client_name));
+        si->last_connect_disconnect = connect_time;
+        LOG(LOG_LEVEL_INFO,
+            "sesman: Session on display :%d is connected from client '%s'",
+            si->display, si->client_name);
+    }
+
+    return rv;
+}
+
+/******************************************************************************/
+static int
+process_client_disconnect_event(struct session_item *si)
+{
+    int rv;
+    time_t disconnect_time;
+
+    rv = ercp_get_client_disconnect_event(si->sesexec_trans, &disconnect_time);
+    if (rv == 0)
+    {
+        si->client_ip[0] = '\0';
+        si->client_name[0] = '\0';
+        si->last_connect_disconnect = disconnect_time;
+        LOG(LOG_LEVEL_INFO,
+            "sesman: Session on display :%d has no client connection",
+            si->display);
+    }
+
+    return rv;
+}
+
+/******************************************************************************/
 int
 ercp_process(struct session_item *si)
 {
@@ -108,11 +153,19 @@ ercp_process(struct session_item *si)
             process_session_finished_event(si);
             break;
 
+        case E_ERCP_CLIENT_CONNECT_EVENT:
+            rv = process_client_connect_event(si);
+            break;
+
+        case E_ERCP_CLIENT_DISCONNECT_EVENT:
+            rv = process_client_disconnect_event(si);
+            break;
+
         default:
         {
             char buff[64];
             ercp_msgno_to_str(msgno, buff, sizeof(buff));
-            LOG(LOG_LEVEL_ERROR, "Ignored EICP message %s", buff);
+            LOG(LOG_LEVEL_ERROR, "Ignored ERCP message %s", buff);
         }
     }
     return rv;

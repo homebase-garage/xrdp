@@ -47,8 +47,13 @@ enum ercp_msg_code
     E_ERCP_SESSION_ANNOUNCE_EVENT, // sesexec -> sesman
     E_ERCP_SESSION_FINISHED_EVENT, // sesexec -> sesman
 
-    E_ERCP_CONNECT_SESSION_REQUEST // sesman -> sesexec
-    // No E_EICP_CONNECT_SESSION_RESPONSE - response sent over SCP
+    // A connect session request has no matching response, but if
+    // successful, a client connect event will be generated.
+    E_ERCP_CONNECT_SESSION_REQUEST, // sesman -> sesexec
+    // No E_ERCP_CONNECT_SESSION_RESPONSE
+
+    E_ERCP_CLIENT_CONNECT_EVENT,    // sesexec -> sesman
+    E_ERCP_CLIENT_DISCONNECT_EVENT  // sesexec -> sesman
 };
 
 /* Common facilities */
@@ -236,14 +241,18 @@ ercp_send_session_finished_event(struct trans *trans);
  * A response is sent directly to the SCP client, rather than back
  * to sesman
  *
- * @param trans EiCP transport
+ * @param trans ERCP transport
  * @param scp_fd SCP file descriptor for a response
+ * @param client_ip IP address of connecting client
+ * @param client_name Name of connecting client (from RDP client core info)
  * @param scp_flags Flags from scp_send_connect_session_request()
  * @return != 0 for error
  */
 int
 ercp_send_connect_session_request(struct trans *trans,
                                   int scp_fd,
+                                  const char *client_ip,
+                                  const char *client_name,
                                   unsigned int scp_flags);
 
 /**
@@ -258,13 +267,84 @@ ercp_send_connect_session_request(struct trans *trans,
  *
  * @param trans ERCP transport
  * @param[out] scp_fd SCP file descriptor for a response
+ * @param[out] client_ip IP address of connecting client
+ * @param[out] client_name Name of connecting client
  * @param[out] scp_flags Flags from scp_send_connect_session_request()
  * @return != 0 for error
  */
 int
 ercp_get_connect_session_request(struct trans *trans,
                                  int *scp_fd,
+                                 const char **client_ip,
+                                 const char **client_name,
                                  unsigned int *scp_flags);
 
+/**
+ * Send an E_ERCP_CLIENT_CONNECT_EVENT
+ *
+ * Direction : sesexec -> sesman
+ *
+ * This request tells sesman to update its connected client information
+ *
+ * @param trans ERCP transport
+ * @param client_ip IP address of connecting client
+ * @param client_name Name of connecting client (from RDP client core info)
+ * @param connect_time Time at which the connect event occurred
+ * @return != 0 for error
+ */
+int
+ercp_send_client_connect_event(struct trans *trans,
+                               const char *client_ip,
+                               const char *client_name,
+                               time_t connect_time);
+
+/**
+ * Get an E_ERCP_CLIENT_CONNECT_EVENT
+ *
+ * Direction : sesexec -> sesman
+ *
+ * This request tells sesman to update its connected client information
+ *
+ * @param trans ERCP transport
+ * @param[out] client_ip IP address of connecting client
+ * @param[out] client_name Name of connecting client (from RDP client core info)
+ * @param[out] connect_time Time at which the connect event occurred
+ * @return != 0 for error
+ */
+int
+ercp_get_client_connect_event(struct trans *trans,
+                              const char **client_ip,
+                              const char **client_name,
+                              time_t *connect_time);
+
+/**
+ * Send an E_ERCP_CLIENT_DISCONNECT_EVENT
+ *
+ * Direction : sesexec -> sesman
+ *
+ * This request tells sesman to update its connected client information
+ *
+ * @param trans ERCP transport
+ * @param disconnect_time Time at which the disconnect event occurred
+ * @return != 0 for error
+ */
+int
+ercp_send_client_disconnect_event(struct trans *trans,
+                                  time_t disconnect_time);
+
+/**
+ * Get an E_ERCP_CLIENT_DISCONNECT_EVENT
+ *
+ * Direction : sesexec -> sesman
+ *
+ * This request tells sesman to update its connected client information
+ *
+ * @param trans ERCP transport
+ * @param[out] disconnect_time Time at which the disconnect event occurred
+ * @return != 0 for error
+ */
+int
+ercp_get_client_disconnect_event(struct trans *trans,
+                                 time_t *disconnect_time);
 
 #endif /* ERCP_H */

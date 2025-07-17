@@ -30,6 +30,7 @@
 #include <sys/types.h>
 
 #include "ccp_application_types.h"
+#include "xrdp_constants.h"
 
 struct config_sesman;
 struct trans;
@@ -105,6 +106,21 @@ extern struct trans *g_ecp_trans;
  * Used to communicate with the currently connected xrdp process
  */
 extern struct trans *g_ccp_trans;
+
+/**
+ * Last connected client IP address
+ */
+extern char g_client_ip[MAX_PEER_ADDRSTRLEN];
+
+/**
+ * Last connected client name
+ */
+extern char g_client_name[INFO_CLIENT_NAME_BYTES_UTF8];
+
+/**
+ * Last connect / disconnect time
+ */
+extern time_t g_last_connect_disconnect;
 
 /**
  * Callback to process incoming ERCP data

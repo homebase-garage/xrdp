@@ -72,8 +72,10 @@ handle_connect_session_request(struct trans *self)
 {
     int scp_fd = -1;
     unsigned int scp_flags;
-
-    int rv = ercp_get_connect_session_request(self, &scp_fd, &scp_flags);
+    const char *client_ip;
+    const char *client_name;
+    int rv = ercp_get_connect_session_request(self, &scp_fd, &client_ip,
+             &client_name, &scp_flags);
     if (rv == 0)
     {
         struct trans *scp_trans;
@@ -107,10 +109,20 @@ handle_connect_session_request(struct trans *self)
             scp_status = get_session_fds(g_session_data, scp_flags,
                                          &display_fd, &chan_fd);
 
-            // Tell sesman about the new client connection
-            if (g_ecp_trans != NULL)
+            if (scp_status == E_SCP_SCONNECT_OK)
             {
-                /// TODO: client connect event
+                // Tell sesman about the new client connection
+                strlcpy(g_client_ip, client_ip, sizeof(g_client_ip));
+                strlcpy(g_client_name, client_name, sizeof(g_client_name));
+                g_last_connect_disconnect = time(NULL);
+
+                if (g_ecp_trans != NULL)
+                {
+                    (void)ercp_send_client_connect_event(
+                        g_ecp_trans, g_client_ip, g_client_name,
+                        g_last_connect_disconnect);
+
+                }
             }
 
             // Pass the session file descriptors to the client

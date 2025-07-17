@@ -43,6 +43,9 @@ msgno_to_str(unsigned short n)
 
         (n == E_ERCP_CONNECT_SESSION_REQUEST) ? "ERCP_CONNECT_SESSION_REQUEST" :
 
+        (n == E_ERCP_CLIENT_CONNECT_EVENT) ? "ERCP_CLIENT_CONNECT_EVENT" :
+        (n == E_ERCP_CLIENT_DISCONNECT_EVENT) ? "ERCP_CLIENT_DISCONNECT_EVENT" :
+
         NULL;
 }
 
@@ -168,7 +171,7 @@ ercp_send_session_announce_event(struct trans *trans,
                bpp,
                &guid_descriptor,
                start_ip_addr,
-               start_time);
+               (int64_t)start_time);
 }
 
 /*****************************************************************************/
@@ -237,27 +240,94 @@ ercp_send_session_finished_event(struct trans *trans)
 int
 ercp_send_connect_session_request(struct trans *trans,
                                   int scp_fd,
+                                  const char *client_ip,
+                                  const char *client_name,
                                   unsigned int scp_flags)
 {
     return libipm_msg_out_simple_send(
                trans, (int)E_ERCP_CONNECT_SESSION_REQUEST,
-               "hu", scp_fd, scp_flags);
+               "hssu", scp_fd, client_ip, client_name, scp_flags);
 }
 
 /*****************************************************************************/
-
 int
 ercp_get_connect_session_request(struct trans *trans,
                                  int *scp_fd,
+                                 const char **client_ip,
+                                 const char **client_name,
                                  unsigned int *scp_flags)
 {
     /* Intermediate values */
     uint32_t i_flags;
 
-    int rv = libipm_msg_in_parse(trans, "hu", scp_fd, &i_flags);
+    int rv = libipm_msg_in_parse(trans, "hssu",
+                                 scp_fd, client_ip, client_name, &i_flags);
     if (rv == 0)
     {
         *scp_flags = i_flags;
+    }
+
+    return rv;
+}
+
+/*****************************************************************************/
+
+int
+ercp_send_client_connect_event(struct trans *trans,
+                               const char *client_ip,
+                               const char *client_name,
+                               time_t connect_time)
+{
+    return libipm_msg_out_simple_send(
+               trans, (int)E_ERCP_CLIENT_CONNECT_EVENT,
+               "ssx", client_ip, client_name, (int64_t)connect_time);
+}
+
+/*****************************************************************************/
+
+int
+ercp_get_client_connect_event(struct trans *trans,
+                              const char **client_ip,
+                              const char **client_name,
+                              time_t *connect_time)
+{
+    /* Intermediate values */
+    int64_t i_connect_time;
+
+    int rv = libipm_msg_in_parse(trans, "ssx",
+                                 client_ip, client_name, &i_connect_time);
+    if (rv == 0)
+    {
+        *connect_time = i_connect_time;
+    }
+
+    return rv;
+}
+
+/*****************************************************************************/
+
+int
+ercp_send_client_disconnect_event(struct trans *trans,
+                                  time_t disconnect_time)
+{
+    return libipm_msg_out_simple_send(
+               trans, (int)E_ERCP_CLIENT_DISCONNECT_EVENT,
+               "x", (int64_t)disconnect_time);
+}
+
+/*****************************************************************************/
+
+int
+ercp_get_client_disconnect_event(struct trans *trans,
+                                 time_t *disconnect_time)
+{
+    /* Intermediate values */
+    int64_t i_disconnect_time;
+
+    int rv = libipm_msg_in_parse(trans, "x", &i_disconnect_time);
+    if (rv == 0)
+    {
+        *disconnect_time = i_disconnect_time;
     }
 
     return rv;

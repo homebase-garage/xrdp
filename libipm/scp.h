@@ -421,6 +421,8 @@ scp_get_create_session_response(struct trans *trans,
  *
  * @param trans SCP transport
  * @param guid Session guid
+ * @param client_ip IP address of connecting client
+ * @param client_name Name of connecting client (from RDP client core info)
  * @param flags Flags which affect the returned FDs
  * @return != 0 for error
  *
@@ -429,6 +431,8 @@ scp_get_create_session_response(struct trans *trans,
 int
 scp_send_connect_session_request(struct trans *trans,
                                  const struct guid *guid,
+                                 const char *client_ip,
+                                 const char *client_name,
                                  unsigned int flags);
 
 
@@ -437,12 +441,16 @@ scp_send_connect_session_request(struct trans *trans,
  *
  * @param trans SCP transport
  * @param[out] guid Session guid
+ * @param[out] client_ip IP address of connecting client
+ * @param[out] client_name Name of connecting client
  * @param[out] flags Flags which affect the returned FDs
  * @return != 0 for error
  */
 int
 scp_get_connect_session_request(struct trans *trans,
                                 struct guid *guid,
+                                const char **client_ip,
+                                const char **client_name,
                                 unsigned int *flags);
 
 /**

@@ -336,18 +336,23 @@ session_list_get_byuid(const uid_t *uid, unsigned int *cnt, unsigned int flags)
 
         if (SESSION_IN_USE(si) && (uid == NULL || *uid == si->uid))
         {
-            (sess[index]).sid = si->sesexec_pid;
-            (sess[index]).display = si->display;
-            (sess[index]).type = si->type;
-            (sess[index]).height = si->start_height;
-            (sess[index]).width = si->start_width;
-            (sess[index]).bpp = si->bpp;
-            (sess[index]).start_time = si->start_time;
-            (sess[index]).uid = si->uid;
-            (sess[index]).start_ip_addr = g_strdup(si->start_ip_addr);
+            sess[index].sid = si->sesexec_pid;
+            sess[index].display = si->display;
+            sess[index].type = si->type;
+            sess[index].height = si->start_height;
+            sess[index].width = si->start_width;
+            sess[index].bpp = si->bpp;
+            sess[index].start_time = si->start_time;
+            sess[index].uid = si->uid;
+            sess[index].start_ip_addr = g_strdup(si->start_ip_addr);
+            sess[index].client_ip = g_strdup(si->client_ip);
+            sess[index].client_name = g_strdup(si->client_name);
+            sess[index].last_connect_disconnect = si->last_connect_disconnect;
 
             /* Check for string allocation failures */
-            if ((sess[index]).start_ip_addr == NULL)
+            if (sess[index].start_ip_addr == NULL ||
+                    sess[index].client_ip == NULL ||
+                    sess[index].client_name == NULL)
             {
                 free_session_info_list(sess, *cnt);
                 (*cnt) = 0;
@@ -390,6 +395,8 @@ free_session_info_list(struct scp_session_info *sesslist, unsigned int cnt)
         for (i = 0 ; i < cnt ; ++i)
         {
             g_free(sesslist[i].start_ip_addr);
+            g_free(sesslist[i].client_ip);
+            g_free(sesslist[i].client_name);
         }
     }
 

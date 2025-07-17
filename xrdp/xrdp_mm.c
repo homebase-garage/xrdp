@@ -363,7 +363,10 @@ xrdp_mm_get_session_fds(struct xrdp_mm *self)
     }
 
     rv = scp_send_connect_session_request(self->sesman_trans,
-                                          &self->guid, flags);
+                                          &self->guid,
+                                          self->wm->client_info->client_ip,
+                                          self->wm->client_info->client_name,
+                                          flags);
     return rv;
 }
 

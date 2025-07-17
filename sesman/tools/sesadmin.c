@@ -151,6 +151,21 @@ print_session(const struct scp_session_info *s)
     {
         printf("\tStart IP address: %s\n", s->start_ip_addr);
     }
+    if (s->client_ip[0] != '\0' && s->client_name[0] != '\0')
+    {
+        printf("\tConnection state: connected\n");
+        printf("\tConnected client IP: %s\n", s->client_ip);
+        printf("\tConnected client name: %s\n", s->client_name);
+        printf("\tConnection start time: %s\n",
+               ctime(&s->last_connect_disconnect));
+    }
+    else
+    {
+        printf("\tConnection state: disconnected\n");
+        printf("\tConnection end time: %s\n",
+               (s->last_connect_disconnect == 0) ? "-" :
+               ctime(&s->last_connect_disconnect));
+    }
     g_free(username);
 }
 
