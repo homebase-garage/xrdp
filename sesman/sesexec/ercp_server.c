@@ -131,6 +131,13 @@ handle_connect_session_request(struct trans *self)
 
             if (rv == 0 && scp_status == E_SCP_SCONNECT_OK)
             {
+                // Variables to pass to the reconnect script
+                const char *vars[] =
+                {
+                    "XRDP_CLIENT_IP", g_client_ip,
+                    "XRDP_CLIENT_NAME", g_client_name,
+                    NULL // Terminator
+                };
                 // Don't run the reconnect script on the first connect,
                 // unless we're configured to do so.
                 if (session_increment_connect_count(g_session_data) == 0)
@@ -140,7 +147,7 @@ handle_connect_session_request(struct trans *self)
                     if (g_cfg->always_run_reconnect)
                     {
                         session_run_reconnect_script(g_login_info,
-                                                     g_session_data);
+                                                     g_session_data, vars);
                     }
                 }
                 else
@@ -148,7 +155,7 @@ handle_connect_session_request(struct trans *self)
                     LOG(LOG_LEVEL_INFO, "User %s has reconnected to a session",
                         g_login_info->username);
                     session_run_reconnect_script(g_login_info,
-                                                 g_session_data);
+                                                 g_session_data, vars);
                 }
 
                 // Convert the SCP transport to a CCP transport, and
