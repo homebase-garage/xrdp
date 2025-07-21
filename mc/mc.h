@@ -41,7 +41,7 @@ struct mod
     int version; /* internal version */
     /* client functions */
     int (*mod_start)(struct mod *v, int w, int h, int bpp);
-    int (*mod_connect)(struct mod *v);
+    int (*mod_connect)(struct mod *v, int fd);
     int (*mod_event)(struct mod *v, int msg, long param1, long param2,
                      long param3, long param4);
     int (*mod_signal)(struct mod *v);

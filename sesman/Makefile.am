@@ -15,14 +15,16 @@ sbin_PROGRAMS = \
   xrdp-sesman
 
 xrdp_sesman_SOURCES = \
+  display_utils.c \
+  display_utils.h \
   eicp_process.c \
   eicp_process.h \
   ercp_process.c \
   ercp_process.h \
   lock_uds.c \
   lock_uds.h \
-  pre_session_list.c \
-  pre_session_list.h \
+  scp_list.c \
+  scp_list.h \
   scp_process.c \
   scp_process.h \
   sesman.c \

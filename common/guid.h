@@ -29,7 +29,7 @@
 
 #define GUID_SIZE 16  /* bytes */
 #define GUID_STR_SIZE (GUID_SIZE * 2 + 4 + 1)   /* w/ 4 hyphens + null terminator */
-
+#define GUID_ARE_EQUAL(g1,g2) (memcmp((g1)->g, (g2)->g, GUID_SIZE) == 0)
 
 /**
  * Use a struct for the guid so we can easily copy by assignment.

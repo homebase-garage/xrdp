@@ -30,19 +30,118 @@
 
 #include "arch.h"
 
+#include "login_info.h"
+#include "scp.h"
 #include "sesexec.h"
+#include "os_calls.h"
 #include "session.h"
+#include "sesman_config.h"
 #include "trans.h"
 
 #include "ercp.h"
 #include "ercp_server.h"
 
 /******************************************************************************/
-static int
-handle_session_reconnect_event(struct trans *self)
+static enum scp_sconnect_status
+get_session_fds(struct session_data *sd, unsigned int scp_flags,
+                int *display_fd, int *chan_fd)
 {
-    session_reconnect(g_login_info, g_session_data);
-    return 0;
+    enum scp_sconnect_status result = E_SCP_SCONNECT_OK;
+
+    if ((*display_fd = session_get_display_server_fd(g_login_info, sd)) < 0)
+    {
+        result = E_SCP_SCONNECT_SERVER_FAIL;
+    }
+    else if ((scp_flags & E_SCP_SCONNECT_FLAG_NEED_CHANSRV) == 0)
+    {
+        // Don't need to try to connect to chansrv
+        *chan_fd = -1;
+    }
+    else
+    {
+        // If this fails, it's inconvenient, but not a show-stopper
+        *chan_fd = session_get_chansrv_fd(g_login_info, sd);
+    }
+
+    return result;
+}
+
+/******************************************************************************/
+static int
+handle_connect_session_request(struct trans *self)
+{
+    int scp_fd = -1;
+    unsigned int scp_flags;
+
+    int rv = ercp_get_connect_session_request(self, &scp_fd, &scp_flags);
+    if (rv == 0)
+    {
+        struct trans *scp_trans;
+
+        if ((scp_trans = scp_init_trans_from_fd(scp_fd,
+                                                TRANS_TYPE_SERVER,
+                                                sesexec_is_term)) == NULL)
+        {
+            LOG(LOG_LEVEL_ERROR, "Can't create SCP trans");
+            rv = 1;
+        }
+        else
+        {
+            scp_fd = -1; // Don't close this twice!
+
+            // Now we've got a transport we can send data back to
+            // the SCP client
+            enum scp_sconnect_status scp_status;
+            int display_fd = -1;
+            int chan_fd = -1;
+            scp_status = get_session_fds(g_session_data, scp_flags,
+                                         &display_fd, &chan_fd);
+            rv = scp_send_connect_session_response(scp_trans, scp_status,
+                                                   display_fd, chan_fd);
+
+            if (rv == 0 && scp_status == E_SCP_SCONNECT_OK)
+            {
+                // Don't run the reconnect script on the first connect,
+                // unless we're configured to do so.
+                if (session_increment_connect_count(g_session_data) == 0)
+                {
+                    LOG(LOG_LEVEL_INFO, "User %s has connected to a session",
+                        g_login_info->username);
+                    if (g_cfg->always_run_reconnect)
+                    {
+                        session_run_reconnect_script(g_login_info,
+                                                     g_session_data);
+                    }
+                }
+                else
+                {
+                    LOG(LOG_LEVEL_INFO, "User %s has reconnected to a session",
+                        g_login_info->username);
+                    session_run_reconnect_script(g_login_info,
+                                                 g_session_data);
+                }
+            }
+
+            // Regardless of the result of the send, we must close all
+            // our copies of file descriptors.
+            if (display_fd >= 0)
+            {
+                g_file_close(display_fd);
+            }
+            if (chan_fd >= 0)
+            {
+                g_file_close(chan_fd);
+            }
+            trans_delete(scp_trans);
+        }
+    }
+
+    if (scp_fd >= 0)
+    {
+        g_file_close(scp_fd);
+    }
+
+    return rv;
 }
 
 /******************************************************************************/
@@ -54,8 +153,8 @@ ercp_server(struct trans *self)
 
     switch ((msgno = ercp_msg_in_get_msgno(self)))
     {
-        case E_ERCP_SESSION_RECONNECT_EVENT:
-            rv = handle_session_reconnect_event(self);
+        case E_ERCP_CONNECT_SESSION_REQUEST:
+            rv = handle_connect_session_request(self);
             break;
 
         default:

@@ -64,6 +64,13 @@ handle_sys_login_request(struct trans *self)
         }
         else
         {
+            if (g_login_info != NULL)
+            {
+                // Shouldn't get here. Prevent a memory leak.
+                LOG(LOG_LEVEL_WARNING,
+                    "Asked to sys login when a login has already been made");
+                login_info_free(g_login_info);
+            }
             g_login_info = login_info_sys_login_user(scp_trans, username,
                            password, ip_addr);
 
@@ -86,6 +93,46 @@ handle_sys_login_request(struct trans *self)
 
 /******************************************************************************/
 static int
+handle_uds_login_request(struct trans *self)
+{
+    int scp_fd;
+
+    int rv = eicp_get_uds_login_request(self, &scp_fd);
+    if (rv == 0)
+    {
+        struct trans *scp_trans;
+        scp_trans = scp_init_trans_from_fd(scp_fd, TRANS_TYPE_SERVER,
+                                           sesexec_is_term);
+        if (scp_trans == NULL)
+        {
+            LOG(LOG_LEVEL_ERROR, "Can't create SCP trans");
+            g_file_close(scp_fd);
+            rv = 1;
+        }
+        else
+        {
+            if (g_login_info != NULL)
+            {
+                // Shouldn't get here. Prevent a memory leak.
+                LOG(LOG_LEVEL_WARNING,
+                    "Asked to UDS login when a login has already been made");
+                login_info_free(g_login_info);
+            }
+            // The following call logs errors, but these are not
+            // returned to the caller, as the call is expected to succeed.
+            if ((g_login_info = login_info_uds_login_user(scp_trans)) == NULL)
+            {
+                rv = 1;
+            }
+            trans_delete(scp_trans);
+        }
+    }
+
+    return rv;
+}
+
+/******************************************************************************/
+static int
 handle_logout_request(struct trans *self)
 {
     LOG(LOG_LEVEL_INFO, "xrdp-sesexec pid %d is now logging out", g_pid);
@@ -97,66 +144,50 @@ handle_logout_request(struct trans *self)
 static int
 handle_create_session_request(struct trans *self)
 {
-    int scp_fd;
     struct session_parameters sp = {0};
     int status;
 
     status = eicp_get_create_session_request(
-                 self, &scp_fd, &sp.display,
+                 self, &sp.display,
                  &sp.type, &sp.width, &sp.height,
                  &sp.bpp, &sp.shell, &sp.directory);
     if (status == 0)
     {
-        // Need to talk to the SCP client
-        struct trans *scp_trans;
-        scp_trans = scp_init_trans_from_fd(scp_fd, TRANS_TYPE_SERVER,
-                                           sesexec_is_term);
-        if (scp_trans == NULL)
+        enum scp_screate_status scp_status = E_SCP_SCREATE_OK;
+
+        // Must be logged in to start a session
+        if (g_login_info == NULL)
         {
-            LOG(LOG_LEVEL_ERROR, "Can't create SCP trans");
-            g_file_close(scp_fd);
-            status = 1;
+            scp_status = E_SCP_SCREATE_NOT_LOGGED_IN;
         }
         else
         {
-            enum scp_screate_status scp_status = E_SCP_SCREATE_OK;
+            // Try to create the session
+            sp.guid = guid_new();
+            scp_status = session_start(g_login_info, &sp, &g_session_data);
+        }
 
-            // Use the UID from the SCP connection if the user hasn't
-            // explicitly logged in
-            if (g_login_info == NULL &&
-                    (g_login_info = login_info_uds_login_user(scp_trans)) == NULL)
-            {
-                scp_status = E_SCP_SCREATE_GENERAL_ERROR;
-            }
-
-            if (scp_status == E_SCP_SCREATE_OK)
-            {
-                // Try to create the session
-                sp.guid = guid_new();
-                scp_status = session_start(g_login_info, &sp, &g_session_data);
-            }
-
+        // Return the creation status to sesman.
+        status = eicp_send_create_session_response(self, scp_status, &sp.guid);
+        if (status == 0 && scp_status == E_SCP_SCREATE_OK)
+        {
             // Further comms to sesman is sent over the ERCP protocol
             ercp_trans_from_eicp_trans(self,
                                        sesexec_ercp_data_in,
                                        (void *)self);
 
-            if (scp_status != E_SCP_SCREATE_OK)
-            {
-                // Tell sesman the session hasn't started
-                (void)ercp_send_session_finished_event(self);
-            }
-            else if ((status = ercp_send_session_announce_event(
-                                   self,
-                                   sp.display,
-                                   g_login_info->uid,
-                                   sp.type,
-                                   sp.width,
-                                   sp.height,
-                                   sp.bpp,
-                                   &sp.guid,
-                                   g_login_info->ip_addr,
-                                   session_get_start_time(g_session_data))) != 0)
+            // Announce the session to sesman
+            if ((status = ercp_send_session_announce_event(
+                              self,
+                              sp.display,
+                              g_login_info->uid,
+                              sp.type,
+                              sp.width,
+                              sp.height,
+                              sp.bpp,
+                              &sp.guid,
+                              g_login_info->ip_addr,
+                              session_get_start_time(g_session_data))) != 0)
             {
                 // We failed to tell sesman about the new session. This
                 // probably means sesman has exited in the time between
@@ -171,24 +202,15 @@ handle_create_session_request(struct trans *self)
                 // new one
                 LOG(LOG_LEVEL_ERROR,
                     "sesman appears to have failed - stopping session");
-                scp_status = E_SCP_SCREATE_GENERAL_ERROR;
             }
             else if ((status = sesexec_discover_enable()) != 0)
             {
                 // Equally regrettable - we can't make the session
-                // discoverable, so we'll stop it. We can tell sesman
-                // about this one however.
+                // discoverable, so we'll stop it.
                 LOG(LOG_LEVEL_ERROR,
                     "unable to make session discoverable"
                     " - stopping session");
-                (void)ercp_send_session_finished_event(self);
-                scp_status = E_SCP_SCREATE_GENERAL_ERROR;
             }
-
-            // Return the status to the SCP client.
-            (void)scp_send_create_session_response(scp_trans, scp_status,
-                                                   sp.display, &sp.guid);
-            trans_delete(scp_trans);
         }
     }
 
@@ -211,6 +233,10 @@ eicp_server(struct trans *self)
     {
         case E_EICP_SYS_LOGIN_REQUEST:
             rv = handle_sys_login_request(self);
+            break;
+
+        case E_EICP_UDS_LOGIN_REQUEST:
+            rv = handle_uds_login_request(self);
             break;
 
         case E_EICP_LOGOUT_REQUEST:

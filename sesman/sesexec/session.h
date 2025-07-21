@@ -109,6 +109,22 @@ time_t
 session_get_start_time(const struct session_data *sd);
 
 /**
+ * Returns the connect count for an active session
+ * @param sd session_data for this session
+ * @return connect count
+ */
+unsigned int
+session_get_connect_count(const struct session_data *sd);
+
+/**
+ * Increment the connect count for an active session
+ * @param sd session_data for this session
+ * @return Pre-increment value of the connect count
+ */
+unsigned int
+session_increment_connect_count(struct session_data *sd);
+
+/**
  * Returns the parameters used to start the session
  *
  * @param sd session_data for this session
@@ -145,7 +161,21 @@ session_data_free(struct session_data *session_data);
  * Runs the reconnect script for the session
  */
 void
-session_reconnect(struct login_info *login_info,
-                  struct session_data *sd);
+session_run_reconnect_script(const struct login_info *login_info,
+                             const struct session_data *sd);
+
+/**
+ * Connects a file descriptor to the display server
+ */
+int
+session_get_display_server_fd(const struct login_info *login_info,
+                              const struct session_data *sd);
+
+/**
+ * Connects a file descriptor to chansrv
+ */
+int
+session_get_chansrv_fd(const struct login_info *login_info,
+                       const struct session_data *sd);
 
 #endif // SESSION_H

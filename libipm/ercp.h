@@ -44,10 +44,11 @@ struct guid;
 /* Message codes */
 enum ercp_msg_code
 {
-    E_ERCP_SESSION_ANNOUNCE_EVENT,
-    E_ERCP_SESSION_FINISHED_EVENT,
+    E_ERCP_SESSION_ANNOUNCE_EVENT, // sesexec -> sesman
+    E_ERCP_SESSION_FINISHED_EVENT, // sesexec -> sesman
 
-    E_ERCP_SESSION_RECONNECT_EVENT
+    E_ERCP_CONNECT_SESSION_REQUEST // sesman -> sesexec
+    // No E_EICP_CONNECT_SESSION_RESPONSE - response sent over SCP
 };
 
 /* Common facilities */
@@ -156,7 +157,7 @@ ercp_msg_in_reset(struct trans *trans);
  *
  * This event contains all the information known about a session
  *
- * @param trans EICP transport
+ * @param trans ERCP transport
  * @param display Display used by session
  * @param uid UID of user logged in to session
  * @param type Session type
@@ -186,7 +187,7 @@ ercp_send_session_announce_event(struct trans *trans,
  *
  * This event contains all the information known about a session
  *
- * @param trans EICP transport
+ * @param trans ERCP transport
  * @param[out] display Display used by session.
  * @param[out] uid UID of user logged in to session
  * @param[out] type Session type
@@ -219,27 +220,51 @@ ercp_get_session_announce_event(struct trans *trans,
  * This event simply states the attached session has finished and can be
  * removed from any data structures held by sesman
  *
- * @param trans EICP transport
+ * @param trans ERCP transport
  * @return != 0 for error
  */
 int
 ercp_send_session_finished_event(struct trans *trans);
 
-
-
 /**
- * Send an E_ERCP_SESSION_RECONNECT_EVENT
+ * Send an E_ERCP_CONNECT_SESSION_REQUEST
  *
  * Direction : sesman -> sesexec
  *
- * This event tells sesexec that a reconnection is about to occur, and
- * sesexec should run the reconnect script.
+ * This request tells sesexec to handle a session connection
  *
- * @param trans EICP transport
+ * A response is sent directly to the SCP client, rather than back
+ * to sesman
+ *
+ * @param trans EiCP transport
+ * @param scp_fd SCP file descriptor for a response
+ * @param scp_flags Flags from scp_send_connect_session_request()
  * @return != 0 for error
  */
 int
-ercp_send_session_reconnect_event(struct trans *trans);
+ercp_send_connect_session_request(struct trans *trans,
+                                  int scp_fd,
+                                  unsigned int scp_flags);
+
+/**
+ * Get an E_ERCP_CONNECT_SESSION_REQUEST
+ *
+ * Direction : sesman -> sesexec
+ *
+ * This request tells sesexec to handle a session connection
+ *
+ * A response is sent directly to the SCP client, rather than back
+ * to sesman
+ *
+ * @param trans ERCP transport
+ * @param[out] scp_fd SCP file descriptor for a response
+ * @param[out] scp_flags Flags from scp_send_connect_session_request()
+ * @return != 0 for error
+ */
+int
+ercp_get_connect_session_request(struct trans *trans,
+                                 int *scp_fd,
+                                 unsigned int *scp_flags);
 
 
 #endif /* ERCP_H */

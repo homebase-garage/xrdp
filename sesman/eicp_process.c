@@ -32,59 +32,62 @@
 
 #include "eicp.h"
 #include "eicp_process.h"
+#include "ercp.h"
 #include "os_calls.h"
-#include "pre_session_list.h"
+#include "scp_list.h"
+#include "session_list.h"
 #include "scp.h"
 #include "sesman.h"
 #include "sesman_access.h"
 #include "sesman_config.h"
+#include "guid.h"
 
 /******************************************************************************/
 
 static int
-process_sys_login_response(struct pre_session_item *psi)
+process_sys_login_response(struct scp_list_item *sli)
 {
     int rv;
     int is_logged_in;
     uid_t uid;
     int scp_fd;
 
-    rv = eicp_get_sys_login_response(psi->sesexec_trans, &is_logged_in,
+    rv = eicp_get_sys_login_response(sli->sesexec_trans, &is_logged_in,
                                      &uid, &scp_fd);
     if (rv == 0)
     {
         LOG(LOG_LEVEL_INFO, "Received sys login status for %s : %s",
-            psi->username,
+            sli->username,
             (is_logged_in) ? "logged in" : "not logged in");
 
         if (!is_logged_in)
         {
             // This shouldn't happen. Close the connection to the
             // client immediately.
-            psi->dispatcher_action = E_PSD_TERMINATE_PRE_SESSION;
+            sli->dispatcher_action = E_SLD_TERMINATE_SCP_CONN;
         }
         else
         {
             /* We've been handed back the client connection */
-            psi->client_trans = scp_init_trans_from_fd(scp_fd,
+            sli->client_trans = scp_init_trans_from_fd(scp_fd,
                                 TRANS_TYPE_SERVER,
                                 sesman_is_term);
-            if (psi->client_trans == NULL)
+            if (sli->client_trans == NULL)
             {
                 LOG(LOG_LEVEL_ERROR, "Can't re-create client connection");
                 g_file_close(scp_fd);
-                psi->dispatcher_action = E_PSD_TERMINATE_PRE_SESSION;
+                sli->dispatcher_action = E_SLD_TERMINATE_SCP_CONN;
             }
             else
             {
-                psi->client_trans->trans_data_in = sesman_scp_data_in;
-                psi->client_trans->callback_data = (void *)psi;
-                psi->login_state = E_PS_LOGIN_SYS;
-                psi->uid = uid;
+                sli->client_trans->trans_data_in = sesman_scp_data_in;
+                sli->client_trans->callback_data = (void *)sli;
+                sli->login_state = E_SLI_LOGIN_SYS;
+                sli->uid = uid;
                 // For system logins, don't allow admin access
-                //psi->is_admin = access_login_mng_allowed(&g_cfg->sec,
-                //                psi->username);
-                psi->is_admin = 0;
+                //sli->is_admin = access_login_mng_allowed(&g_cfg->sec,
+                //                sli->username);
+                sli->is_admin = 0;
             }
         }
     }
@@ -93,16 +96,75 @@ process_sys_login_response(struct pre_session_item *psi)
 }
 
 /******************************************************************************/
+static int
+process_create_session_response(struct scp_list_item *sli)
+{
+    struct session_item *s_item;
+    int display = -1;
+    struct guid guid;
+    enum scp_screate_status status;
+
+    int rv = eicp_get_create_session_response(sli->sesexec_trans,
+             &status, &guid);
+    if (rv == 0)
+    {
+        // Create an entry on the session list for the new session
+        if (status == E_SCP_SCREATE_OK &&
+                (s_item = session_list_new()) == NULL)
+        {
+            status = E_SCP_SCREATE_NO_MEMORY;
+        }
+
+        if (status == E_SCP_SCREATE_OK)
+        {
+            // Further comms from sesexec comes over the ERCP
+            // protocol
+            ercp_trans_from_eicp_trans(sli->sesexec_trans,
+                                       sesman_ercp_data_in,
+                                       (void *)s_item);
+
+            // Move the new ERCP transport over to the session list item,
+            // and initialise enough data so that a connection request
+            // can be serviced.
+            s_item->sesexec_trans = sli->sesexec_trans;
+            s_item->sesexec_pid = sli->sesexec_pid;
+            s_item->guid = guid;
+            s_item->uid = sli->uid;
+            s_item->display = sli->session_display;
+            display = s_item->display;
+
+            // We don't use the sesexec process again
+            sli->sesexec_trans = NULL;
+            sli->sesexec_pid = 0;
+        }
+        else
+        {
+            guid_clear(&guid);
+            display = -1;
+        }
+        rv = scp_send_create_session_response(sli->client_trans, status,
+                                              display, &guid);
+        sli->create_session_in_progress = 0;
+        sli->session_display = -1;
+    }
+
+    return rv;
+}
+/******************************************************************************/
 int
-eicp_process(struct pre_session_item *psi)
+eicp_process(struct scp_list_item *sli)
 {
     enum eicp_msg_code msgno;
     int rv = 0;
 
-    switch ((msgno = eicp_msg_in_get_msgno(psi->sesexec_trans)))
+    switch ((msgno = eicp_msg_in_get_msgno(sli->sesexec_trans)))
     {
         case E_EICP_SYS_LOGIN_RESPONSE:
-            rv = process_sys_login_response(psi);
+            rv = process_sys_login_response(sli);
+            break;
+
+        case E_EICP_CREATE_SESSION_RESPONSE:
+            rv = process_create_session_response(sli);
             break;
 
         default:

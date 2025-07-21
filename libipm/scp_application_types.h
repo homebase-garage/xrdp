@@ -99,6 +99,7 @@ enum scp_screate_status
     E_SCP_SCREATE_NO_DISPLAY, ///< No X server display number is available
     E_SCP_SCREATE_X_SERVER_FAIL, ///< X server could not be started
     E_SCP_SCREATE_SESSION_FAIL, ///< The session failed quickly
+    E_SCP_SCREATE_IN_PROGRESS, ///< A create session request is in progress
     E_SCP_SCREATE_GENERAL_ERROR ///< An unspecific error has occurred
 };
 
@@ -112,6 +113,39 @@ enum scp_screate_status
 const char *
 scp_screate_status_to_str(enum scp_screate_status n,
                           char *buff, unsigned int buff_size);
+
+/*
+ * Flags passed to scp_send_connect_session_request()
+ */
+
+/**
+ * Set this to get an FD for chansrv
+ */
+#define E_SCP_SCONNECT_FLAG_NEED_CHANSRV (1<<0)
+
+/**
+ * Status of a session connection request
+ */
+enum scp_sconnect_status
+{
+    E_SCP_SCONNECT_OK = 0, ///< Session created
+    E_SCP_SCONNECT_NOT_LOGGED_IN, ///< Connection is not logged in
+    E_SCP_SCONNECT_NO_SUCH_GUID, ///< GUID does not exist for this user
+    E_SCP_SCONNECT_NO_MEMORY, ///< Memory allocation failure
+    E_SCP_SCONNECT_SERVER_FAIL, ///< Can't connect to X server
+    E_SCP_SCONNECT_GENERAL_ERROR ///< An unspecific error has occurred
+};
+
+/**
+ * Convert an scp_session connection code to a readable string for output
+ * @param n Message code
+ * @param buff to contain string
+ * @param buff_size length of buff
+ * @return buff is returned for convenience.
+ */
+const char *
+scp_sconnect_status_to_str(enum scp_sconnect_status n,
+                           char *buff, unsigned int buff_size);
 
 /**
  * Status of an list sessions message
@@ -156,6 +190,5 @@ enum scp_create_sockdir_status
      */
     E_SCP_CS_OTHER_ERROR
 };
-
 
 #endif /* SCP_APPLICATION_TYPES_H */

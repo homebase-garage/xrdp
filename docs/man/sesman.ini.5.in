@@ -86,6 +86,11 @@ to the existing session. If the path is not a full path, it will be resolved as
 relative path to \fI@xrdpconfdir@\fR. If not specified, defaults to
 \fI@xrdpconfdir@/reconnectwm.sh\fR.
 
+.TP
+\fBAlwaysRunReconnect\fR=\fI[yes|no]\fR
+If set to \fB1\fR, \fBtrue\fR or \fByes\fR, the \fBReconnectScript\fR will
+be run for the initial connection to a session, as well as all reconnects.
+
 .SH "LOGGING"
 Following parameters can be used in the \fB[Logging]\fR and \fB[ChansrvLogging]\fR 
 sections.
@@ -371,9 +376,14 @@ transitions between confinement domains.
 
 .TP
 \fBSessionSockdirGroup\fR=\fIgroup\fR
-Sets the group owner of the directories containing session sockets. This
-MUST be the same as runtime_group in xrdp.ini, or xrdp will not
-be able to connect to any sessions.
+Sets the group owner of the directories containing session sockets.
+
+For normal operation with sesman, set this to 'root' for maximum security.
+
+If you are using xrdp to connect to VNC sessions with X server
+sockets or chansrv sockets in the local sockets dir, set this to
+the runtime_group in xrdp.ini. If you do not do this, xrdp will not
+be able to connect to your sessions.
 
 .SH "X11 SERVER"
 Following parameters can be used in the \fB[Xvnc]\fR and

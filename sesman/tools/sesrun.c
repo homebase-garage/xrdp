@@ -611,6 +611,7 @@ main(int argc, char **argv)
             if ((rv = send_create_session_request(t, &sp)) == 0)
             {
                 rv = handle_create_session_response(t);
+                (void)scp_send_close_connection_request(t);
             }
         }
         trans_delete(t);

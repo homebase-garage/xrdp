@@ -27,15 +27,15 @@
 #ifndef SCP_PROCESS_H
 #define SCP_PROCESS_H
 
-struct pre_session_item;
+struct scp_list_item;
 
 /**
  *
  * @brief Processes an SCP message
- * @param sc the sesman connection
+ * @param sli the sesman connection
  *
  */
 int
-scp_process(struct pre_session_item *sc);
+scp_process(struct scp_list_item *sli);
 
 #endif

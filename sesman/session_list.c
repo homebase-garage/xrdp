@@ -42,6 +42,7 @@
 #include "log.h"
 #include "os_calls.h"
 #include "sesman.h"
+#include "set_int.h"
 #include "string_calls.h"
 #include "xrdp_sockets.h"
 
@@ -56,20 +57,19 @@ static struct list *g_session_list = NULL;
 int
 session_list_init(void)
 {
-    int rv = 1;
+    int rv = 0;
     if (g_session_list == NULL)
     {
         g_session_list = list_create_sized(g_cfg->sess.max_sessions);
-    }
-
-    if (g_session_list == NULL)
-    {
-        LOG(LOG_LEVEL_ERROR, "Can't allocate session list");
-    }
-    else
-    {
-        g_session_list->auto_free = 0;
-        rv = 0;
+        if (g_session_list == NULL)
+        {
+            LOG(LOG_LEVEL_ERROR, "Can't allocate session list");
+            rv = 1;
+        }
+        else
+        {
+            g_session_list->auto_free = 0;
+        }
     }
 
     return rv;
@@ -119,7 +119,7 @@ session_list_cleanup(void)
 unsigned int
 session_list_get_count(void)
 {
-    return g_session_list->count;
+    return (g_session_list == NULL) ? 0 : g_session_list->count;
 }
 
 /******************************************************************************/
@@ -159,175 +159,22 @@ session_list_new(void)
 }
 
 /******************************************************************************/
-/**
- *
- * @brief checks if there's a server running on a display
- * @param display the display to check
- * @return 0 if there isn't a display running, nonzero otherwise
- *
- */
-static int
-x_server_running_check_ports(int display)
+void
+session_list_get_session_displays(struct set_int *alloc_displays)
 {
-    char text[256];
-    int x_running;
-    int sck;
+    int count = (g_session_list == NULL) ? 0 : g_session_list->count;
 
-    g_snprintf(text, sizeof(text), X11_UNIX_SOCKET_STR, display);
-    x_running = g_file_exist(text);
-
-    if (!x_running)
+    int i = 0;
+    for (i = 0 ; i < count ; ++i)
     {
-        LOG(LOG_LEVEL_DEBUG, "Did not find a running X server at %s", text);
-        g_snprintf(text, sizeof(text), "/tmp/.X%d-lock", display);
-        x_running = g_file_exist(text);
-    }
+        struct session_item *si;
+        si = (struct session_item *)list_get_item(g_session_list, i);
 
-    if (!x_running) /* check 59xx */
-    {
-        LOG(LOG_LEVEL_DEBUG, "Did not find a running X server at %s", text);
-        if ((sck = g_tcp_socket()) != -1)
+        if (SESSION_IN_USE(si))
         {
-            g_snprintf(text, sizeof(text), "59%2.2d", display);
-            x_running = g_tcp_bind(sck, text);
-            g_tcp_close(sck);
+            set_int_add(alloc_displays, si->display);
         }
     }
-
-    if (!x_running) /* check 60xx */
-    {
-        LOG(LOG_LEVEL_DEBUG, "Did not find a running X server at %s", text);
-        if ((sck = g_tcp_socket()) != -1)
-        {
-            g_snprintf(text, sizeof(text), "60%2.2d", display);
-            x_running = g_tcp_bind(sck, text);
-            g_tcp_close(sck);
-        }
-    }
-
-    if (!x_running) /* check 62xx */
-    {
-        LOG(LOG_LEVEL_DEBUG, "Did not find a running X server at %s", text);
-        if ((sck = g_tcp_socket()) != -1)
-        {
-            g_snprintf(text, sizeof(text), "62%2.2d", display);
-            x_running = g_tcp_bind(sck, text);
-            g_tcp_close(sck);
-        }
-    }
-
-    if (x_running)
-    {
-        LOG(LOG_LEVEL_INFO, "Found X server running at %s", text);
-    }
-
-    return x_running;
-}
-
-/******************************************************************************/
-/* Helper function for get_sorted_display_list():qsort() */
-static int
-icmp(const void *v1, const void *v2)
-{
-    // Pointers point to unsigned ints
-    unsigned int i1 = *(unsigned int *)v1;
-    unsigned int i2 = *(unsigned int *)v2;
-    return (i1 < i2) ? -1 : (i1 > i2) ? 1 : 0;
-}
-
-/******************************************************************************/
-/**
- * Get a sorted array of all the displays allocated to sessions
- * @param[out] cnt Count of displays in list
- * @return Allocated array of displays or NULL for no memory
- *
- * Result must always be freed, even if cnt == 0
- */
-
-static unsigned int *
-get_sorted_session_displays(unsigned int *cnt)
-{
-    unsigned int *displays;
-
-    *cnt = 0;
-    displays = g_new(unsigned int, session_list_get_count() + 1);
-    if (displays == NULL)
-    {
-        LOG(LOG_LEVEL_ERROR, "Can't allocate memory for display list");
-    }
-    else if (g_session_list != NULL)
-    {
-        int i;
-
-        for (i = 0 ; i < g_session_list->count ; ++i)
-        {
-            const struct session_item *si;
-            si = (const struct session_item *)list_get_item(g_session_list, i);
-            if (SESSION_IN_USE(si) && si->display >= 0)
-            {
-                displays[(*cnt)++] = si->display;
-            }
-        }
-        qsort(displays, *cnt, sizeof(displays[0]), icmp);
-    }
-
-    return displays;
-}
-
-/******************************************************************************/
-int
-session_list_get_available_display(void)
-{
-    int rv = -1;
-    unsigned int max_alloc = 0;
-
-    // Find all displays already allocated. We do this to prevent
-    // unnecessary file system accesses, and also to prevent us allocating
-    // the same display number to two callers who call in quick
-    // succession  i.e. if the first caller has not created its X server
-    // by the time we service the second request
-    unsigned int *allocated_displays = get_sorted_session_displays(&max_alloc);
-    if (allocated_displays != NULL)
-    {
-        unsigned int i = 0;
-        unsigned int display;
-
-        for (display = g_cfg->sess.x11_display_offset;
-                display <= g_cfg->sess.max_display_number;
-                ++display)
-        {
-            // Have we already allocated this one?
-            while (i < max_alloc && display > allocated_displays[i])
-            {
-                ++i;
-            }
-            if (i < max_alloc && display == allocated_displays[i])
-            {
-                continue; // Already allocated
-            }
-
-            if (!x_server_running_check_ports(display))
-            {
-                break;
-            }
-        }
-
-        g_free(allocated_displays);
-
-        if (display > g_cfg->sess.max_display_number)
-        {
-            LOG(LOG_LEVEL_ERROR,
-                "X server -- no display in range (%d to %d) is available",
-                g_cfg->sess.x11_display_offset,
-                g_cfg->sess.max_display_number);
-        }
-        else
-        {
-            rv = display;
-        }
-    }
-
-    return rv;
 }
 
 /******************************************************************************/
@@ -512,6 +359,25 @@ session_list_get_byuid(const uid_t *uid, unsigned int *cnt, unsigned int flags)
 
     (*cnt) = count;
     return sess;
+}
+
+/******************************************************************************/
+struct session_item *
+session_list_get_byguid(const struct guid *guid)
+{
+    int i;
+
+    for (i = 0 ; i < g_session_list->count ; ++i)
+    {
+        struct session_item *si;
+        si = (struct session_item *)list_get_item(g_session_list, i);
+        if (SESSION_IN_USE(si) && GUID_ARE_EQUAL(guid, &si->guid))
+        {
+            return si;
+        }
+    }
+
+    return NULL;
 }
 
 /******************************************************************************/

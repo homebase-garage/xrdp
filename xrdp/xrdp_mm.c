@@ -84,6 +84,8 @@ xrdp_mm_create(struct xrdp_wm *owner)
     self->login_values = list_create();
     self->login_values->auto_free = 1;
 
+    self->sesman_display_fd = -1;
+    self->sesman_chansrv_fd = -1;
     self->uid = -1; /* Never good to default UIDs to 0 */
 
     init_libh264_loaded(self);
@@ -173,6 +175,30 @@ xrdp_mm_module_cleanup(struct xrdp_mm *self)
 }
 
 /*****************************************************************************/
+/**
+ * Close file descriptors from sesman
+ * @param self xrdp_mm object
+ *
+ * When we connect to a session, sesman sends us some file descriptors
+ * for the display and chansrv. When we deallocate resources, we need
+ * to close these descriptors if they haven't been consumed.
+ */
+static void
+close_sesman_file_descriptors(struct xrdp_mm *self)
+{
+    if (self->sesman_display_fd >= 0)
+    {
+        g_file_close(self->sesman_display_fd);
+        self->sesman_display_fd = -1;
+    }
+    if (self->sesman_chansrv_fd >= 0)
+    {
+        g_file_close(self->sesman_chansrv_fd);
+        self->sesman_chansrv_fd = -1;
+    }
+}
+
+/*****************************************************************************/
 void
 xrdp_mm_delete(struct xrdp_mm *self)
 {
@@ -198,6 +224,8 @@ xrdp_mm_delete(struct xrdp_mm *self)
     g_free(self->resize_data);
     g_delete_wait_obj(self->resize_ready);
     xrdp_egfx_shutdown_full(self->egfx);
+
+    close_sesman_file_descriptors(self);
     g_free(self);
 }
 
@@ -316,6 +344,25 @@ xrdp_mm_create_session(struct xrdp_mm *self)
                  self->wm->client_info->directory);
     }
 
+    return rv;
+}
+
+
+/*****************************************************************************/
+/* Send a request to sesman to get session file descriptors */
+static int
+xrdp_mm_get_session_fds(struct xrdp_mm *self)
+{
+    int rv;
+    unsigned int flags = 0;
+
+    if (self->wm->client_info->channels_allowed != 0)
+    {
+        flags = E_SCP_SCONNECT_FLAG_NEED_CHANSRV;
+    }
+
+    rv = scp_send_connect_session_request(self->sesman_trans,
+                                          &self->guid, flags);
     return rv;
 }
 
@@ -2658,6 +2705,57 @@ xrdp_mm_process_create_session_response(struct xrdp_mm *self)
 }
 
 /*****************************************************************************/
+static int
+xrdp_mm_process_connect_session_response(struct xrdp_mm *self)
+{
+    enum scp_sconnect_status status;
+
+    int rv;
+
+    self->mmcs_expecting_msg = 0;
+
+    rv = scp_get_connect_session_response(self->sesman_trans, &status,
+                                          &self->sesman_display_fd,
+                                          &self->sesman_chansrv_fd);
+    /* Following this response, the sesman trans is closed */
+    self->delete_sesman_trans = 1;
+
+    if (rv == 0)
+    {
+        if (status == E_SCP_SCONNECT_OK)
+        {
+            xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO,
+                            "Got connection details for session");
+
+            /* Carry on with the connect state machine */
+            xrdp_mm_connect_sm(self);
+        }
+        else
+        {
+            char buff[128];
+            const char *username;
+
+            /* Sort out some logging information */
+            scp_sconnect_status_to_str(status, buff, sizeof(buff));
+            if ((username = xrdp_mm_get_value(self, "username")) == NULL)
+            {
+                username = "???";
+            }
+
+            xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO,
+                            "Can't create session for user %s - %s",
+                            username, buff);
+            xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO, "%s",
+                            "Close the log window to exit.");
+            self->wm->fatal_error_in_log_window = 1;
+            xrdp_wm_mod_connect_done(self->wm, 1);
+        }
+    }
+
+    return rv;
+}
+
+/*****************************************************************************/
 /* This is the callback registered for sesman communication replies. */
 static int
 xrdp_mm_scp_data_in(struct trans *trans)
@@ -2679,6 +2777,10 @@ xrdp_mm_scp_data_in(struct trans *trans)
 
             case E_SCP_CREATE_SESSION_RESPONSE:
                 rv = xrdp_mm_process_create_session_response(self);
+                break;
+
+            case E_SCP_CONNECT_SESSION_RESPONSE:
+                rv = xrdp_mm_process_connect_session_response(self);
                 break;
 
             default:
@@ -2718,6 +2820,7 @@ cleanup_states(struct xrdp_mm *self)
         self->display = 0; /* 10 for :10.0, 11 for :11.0, etc */
         guid_clear(&self->guid);
         self->code = 0; /* ???_SESSION_CODE value */
+        close_sesman_file_descriptors(self);
     }
 }
 
@@ -2857,14 +2960,47 @@ xrdp_mm_sesman_connect(struct xrdp_mm *self)
 
 /*****************************************************************************/
 static int
-xrdp_mm_chansrv_connect(struct xrdp_mm *self, const char *port)
+xrdp_mm_chansrv_connect(struct xrdp_mm *self)
 {
-    if (self->wm->client_info->channels_allowed == 0)
+    char port[XRDP_SOCKETS_MAXPATH];
+
+    port[0] = '\0';
+
+    // Before we create the transport, make sure we know
+    // what we're connecting to.
+    //
+    // If we're using sesman, sesman should already have sent us a file
+    // descriptor for chansrv. If we're not, we need to look at
+    // the 'chansrvport' parameter to get the path to the socket.
+    if (self->use_sesman)
     {
-        LOG(LOG_LEVEL_DEBUG, "%s: "
-            "skip connecting to chansrv because all channels are disabled",
-            __func__);
-        return 0;
+        if (self->sesman_chansrv_fd >= 0)
+        {
+            xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO,
+                            "Connecting to chansrv via sesman");
+        }
+        else
+        {
+            LOG(LOG_LEVEL_WARNING, "xrdp_mm_chansrv_connect: "
+                "No chansrv connection was passed by sesman");
+            return 0;
+        }
+    }
+    else
+    {
+        const char *cp = xrdp_mm_get_value(self, "chansrvport");
+        if (parse_chansrvport(cp, port, sizeof(port),
+                              self->uid) == 0)
+        {
+            xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO,
+                            "Connecting to chansrv on %s",
+                            port);
+        }
+        else
+        {
+            // An error has already been logged
+            return 0;
+        }
     }
 
     /* connect channel redir */
@@ -2879,12 +3015,27 @@ xrdp_mm_chansrv_connect(struct xrdp_mm *self, const char *port)
     self->chan_trans->no_stream_init_on_data_in = 1;
     self->chan_trans->extra_flags = 0;
 
-    /* try to connect for up to 10 seconds */
-    trans_connect(self->chan_trans, NULL, port, 10 * 1000);
+    if (self->use_sesman)
+    {
+        // Pass ownership of the file descriptor to
+        // self->chan_trans
+        self->chan_trans->sck = self->sesman_chansrv_fd;
+        self->sesman_chansrv_fd = -1;
+        self->chan_trans->status = TRANS_STATUS_UP; /* ok */
+        self->chan_trans->type1 = TRANS_TYPE_CLIENT; /* client */
+    }
+    else
+    {
+        /* try to connect for up to 10 seconds */
+        if (trans_connect(self->chan_trans, NULL, port, 10 * 1000) != 0)
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_mm_chansrv_connect: error in "
+                "trans_connect chan");
+        }
+    }
     if (self->chan_trans->status != TRANS_STATUS_UP)
     {
-        LOG(LOG_LEVEL_ERROR, "xrdp_mm_chansrv_connect: error in "
-            "trans_connect chan");
+        /* Nothing more to do */
     }
     else if (xrdp_mm_trans_send_channel_setup(self, self->chan_trans) != 0)
     {
@@ -2911,7 +3062,7 @@ xrdp_mm_chansrv_connect(struct xrdp_mm *self, const char *port)
 
 /*****************************************************************************/
 static int
-xrdp_mm_user_session_connect(struct xrdp_mm *self)
+xrdp_mm_display_server_connect(struct xrdp_mm *self)
 {
     int rv = 0;
 
@@ -3109,8 +3260,18 @@ xrdp_mm_connect_sm(struct xrdp_mm *self)
                 {
                     xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO,
                                     "access control check was successful");
-                    // No reply needed for this one
-                    status = scp_send_logout_request(self->sesman_trans);
+                    if (self->use_sesman)
+                    {
+                        // Logout and leave the connection open
+                        status = scp_send_logout_request(self->sesman_trans);
+                    }
+                    else
+                    {
+                        // Close the connection as we don't need it now
+                        status = scp_send_close_connection_request(
+                                     self->sesman_trans);
+                        self->delete_sesman_trans = 1;
+                    }
                 }
 
                 if (status == 0 && self->use_sesman)
@@ -3160,6 +3321,19 @@ xrdp_mm_connect_sm(struct xrdp_mm *self)
                                     "login was successful - creating session");
                     if ((status = xrdp_mm_create_session(self)) == 0)
                     {
+                        /* Now waiting for a reply from sesman */
+                        self->mmcs_expecting_msg = 1;
+                    }
+                }
+                break;
+
+            case MMCS_GET_SESSION_FILE_DESCRIPTORS:
+                if (self->use_sesman)
+                {
+                    xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO,
+                                    "Getting session connections from sesman");
+                    if ((status = xrdp_mm_get_session_fds(self)) == 0)
+                    {
                         /* Now waiting for a reply from sesman. Note that
                          * when it arrives, sesman is expecting us to
                          * close the connection - we can do nothing else
@@ -3169,12 +3343,12 @@ xrdp_mm_connect_sm(struct xrdp_mm *self)
                 }
                 break;
 
-            case MMCS_CONNECT_TO_SESSION:
+            case MMCS_CONNECT_TO_DISPLAY_SERVER:
             {
                 xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO,
-                                "Connecting to session");
+                                "Connecting to display server");
                 /* This is synchronous - no reply message expected */
-                status = xrdp_mm_user_session_connect(self);
+                status = xrdp_mm_display_server_connect(self);
             }
             break;
 
@@ -3182,35 +3356,15 @@ xrdp_mm_connect_sm(struct xrdp_mm *self)
             {
                 if (self->use_chansrv)
                 {
-                    char portbuff[XRDP_SOCKETS_MAXPATH];
-                    if (self->use_sesman)
+                    if (self->wm->client_info->channels_allowed == 0)
                     {
-                        g_snprintf(portbuff, sizeof(portbuff),
-                                   XRDP_CHANSRV_STR, self->uid, self->display);
-                        xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO,
-                                        "Connecting to chansrv");
+                        LOG(LOG_LEVEL_DEBUG, "skip connecting to chansrv"
+                            " because all channels are disabled");
                     }
                     else
                     {
-                        const char *cp = xrdp_mm_get_value(self, "chansrvport");
-                        if (parse_chansrvport(cp, portbuff, sizeof(portbuff),
-                                              self->uid) == 0)
-                        {
-                            xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO,
-                                            "Connecting to chansrv on %s",
-                                            portbuff);
-                        }
-                        else
-                        {
-                            // An error has already been logged
-                            portbuff[0] = '\0';
-                        }
-                    }
-
-                    if (portbuff[0] != '\0')
-                    {
                         xrdp_mm_update_allowed_channels(self);
-                        xrdp_mm_chansrv_connect(self, portbuff);
+                        xrdp_mm_chansrv_connect(self);
                     }
                 }
             }
@@ -3240,6 +3394,10 @@ xrdp_mm_connect_sm(struct xrdp_mm *self)
         {
             self->delete_sesman_trans = 1;
         }
+
+        /* Close any uncomsumed file descriptors from sesman */
+        close_sesman_file_descriptors(self);
+
         xrdp_wm_mod_connect_done(self->wm, status);
         /* Make sure the module is cleaned up if we weren't successful */
         if (status != 0)
@@ -5107,22 +5265,27 @@ xrdp_mm_setup_mod2(struct xrdp_mm *self)
 
     if (!g_is_wait_obj_set(self->wm->pro_layer->self_term_event))
     {
-        if (self->display > 0)
+        if (self->display < 0)
         {
-            if (self->code == XVNC_SESSION_CODE)
-            {
-                g_snprintf(text, sizeof(text), "%d", 5900 + self->display);
-            }
-            else if (self->code == XORG_SESSION_CODE ||
-                     self->code == XVNC_UDS_SESSION_CODE)
-            {
-                g_snprintf(text, sizeof(text), XRDP_X11RDP_STR,
-                           self->uid, self->display);
-            }
-            else
-            {
-                g_set_wait_obj(self->wm->pro_layer->self_term_event); /* kill session */
-            }
+            LOG(LOG_LEVEL_ERROR,
+                "Unexpected display value %d setting up module", self->display);
+            g_set_wait_obj(self->wm->pro_layer->self_term_event); /* kill session */
+        }
+        else if (self->code == XVNC_SESSION_CODE)
+        {
+            g_snprintf(text, sizeof(text), "%d", 5900 + self->display);
+        }
+        else if (self->code == XORG_SESSION_CODE ||
+                 self->code == XVNC_UDS_SESSION_CODE)
+        {
+            g_snprintf(text, sizeof(text), XRDP_X11RDP_STR,
+                       self->uid, self->display);
+        }
+        else
+        {
+            LOG(LOG_LEVEL_ERROR,
+                "Unexpected session code %d setting up module", self->code);
+            g_set_wait_obj(self->wm->pro_layer->self_term_event); /* kill session */
         }
     }
 
@@ -5158,10 +5321,17 @@ xrdp_mm_setup_mod2(struct xrdp_mm *self)
             self->mod->mod_set_param(self->mod, name, value);
         }
 
-        /* connect */
-        if (self->mod->mod_connect(self->mod) == 0)
+        /* connect
+        *
+         * If we got an fd for the display server from sesman, this
+         * call will use it */
+        if (self->mod->mod_connect(self->mod, self->sesman_display_fd) == 0)
         {
             rv = 0; /* connect success */
+
+            // Ownership of the file descriptor has been
+            // passed to the module
+            self->sesman_display_fd = -1;
 
             // If we've received a recent TS_SYNC_EVENT, pass it on to
             // the module so (e.g.) NumLock starts in the right state.

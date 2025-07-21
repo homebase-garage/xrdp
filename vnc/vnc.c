@@ -2237,7 +2237,7 @@ set_encodings(struct vnc *v)
   return error
 */
 static int
-lib_mod_connect(struct vnc *v)
+lib_mod_connect(struct vnc *v, int fd)
 {
     char cursor_data[32 * (32 * 3)];
     char cursor_mask[32 * (32 / 8)];
@@ -2298,7 +2298,17 @@ lib_mod_connect(struct vnc *v)
     v->trans->si = v->si;
     v->trans->my_source = XRDP_SOURCE_MOD;
 
-    error = trans_connect(v->trans, v->ip, con_port, 3000);
+    if (fd >= 0)
+    {
+        v->trans->sck = fd;
+        v->trans->status = TRANS_STATUS_UP; /* ok */
+        v->trans->type1 = TRANS_TYPE_CLIENT; /* client */
+        error = 0;
+    }
+    else
+    {
+        error = trans_connect(v->trans, v->ip, con_port, 3000);
+    }
 
     if (error != 0)
     {

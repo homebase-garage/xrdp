@@ -53,6 +53,9 @@ msgno_to_str(unsigned short n)
         (n == E_SCP_CREATE_SESSION_REQUEST) ? "SCP_CREATE_SESSION_REQUEST" :
         (n == E_SCP_CREATE_SESSION_RESPONSE) ? "SCP_CREATE_SESSION_RESPONSE" :
 
+        (n == E_SCP_CONNECT_SESSION_REQUEST) ? "SCP_CONNECT_SESSION_REQUEST" :
+        (n == E_SCP_CONNECT_SESSION_RESPONSE) ? "SCP_CONNECT_SESSION_RESPONSE" :
+
         (n == E_SCP_LIST_SESSIONS_REQUEST) ? "SCP_LIST_SESSIONS_REQUEST" :
         (n == E_SCP_LIST_SESSIONS_RESPONSE) ? "SCP_LIST_SESSIONS_RESPONSE" :
 
@@ -512,6 +515,190 @@ scp_get_create_session_response(struct trans *trans,
     {
         *status = (enum scp_screate_status)i_status;
         *display = i_display;
+    }
+
+    return rv;
+}
+
+/*****************************************************************************/
+
+int
+scp_send_connect_session_request(struct trans *trans,
+                                 const struct guid *guid,
+                                 unsigned int flags)
+{
+    struct libipm_fsb guid_descriptor = { (void *)guid, sizeof(*guid) };
+
+    return libipm_msg_out_simple_send(
+               trans,
+               (int)E_SCP_CONNECT_SESSION_REQUEST,
+               "Bu", &guid_descriptor, flags);
+}
+
+/*****************************************************************************/
+
+int
+scp_get_connect_session_request(struct trans *trans,
+                                struct guid *guid,
+                                unsigned int *flags)
+{
+    struct libipm_fsb guid_descriptor = { (void *)guid, sizeof(*guid) };
+    /* Intermediate values */
+    uint32_t i_flags;
+
+    int rv = libipm_msg_in_parse( trans, "Bu", &guid_descriptor, &i_flags);
+
+    if (rv == 0)
+    {
+        *flags = i_flags;
+    }
+
+    return rv;
+}
+
+/*****************************************************************************/
+
+int
+scp_send_connect_session_response(struct trans *trans,
+                                  enum scp_sconnect_status status,
+                                  int display_fd,
+                                  int chan_fd)
+{
+    int rv = libipm_msg_out_init(
+                 trans, (int)E_SCP_CONNECT_SESSION_RESPONSE,
+                 "i", status);
+    // Send the display file descriptor, guarded by a boolean
+    if (rv == 0)
+    {
+        if (display_fd >= 0)
+        {
+            rv = libipm_msg_out_append(
+                     trans, "bh", 1, display_fd);
+        }
+        else
+        {
+            rv = libipm_msg_out_append(trans, "b", 0);
+        }
+    }
+
+    // Send the chansrv file descriptor, guarded by a boolean
+    if (rv == 0)
+    {
+        if (chan_fd >= 0)
+        {
+            rv = libipm_msg_out_append(
+                     trans, "bh", 1, chan_fd);
+        }
+        else
+        {
+            rv = libipm_msg_out_append(trans, "b", 0);
+        }
+    }
+
+    if (rv == 0)
+    {
+        libipm_msg_out_mark_end(trans);
+        if (trans_force_write(trans) != 0)
+        {
+            rv = E_LI_TRANSPORT_ERROR;
+        }
+    }
+
+    return rv;
+}
+
+/*****************************************************************************/
+/**
+ * Helper function to get the file descriptors for a connect
+ *
+ * @param trans SCP trans
+ * @param[out] display_fd Display server file descriptor
+ * @param[out] chan_fd Chansrv file descriptor
+ * @return != 0 for error
+ *
+ * This wrapper is nneded as libipm doesn't currently guarantee to
+ * handle received file descriptors well if an error is encountered
+ * mid-message.
+ *
+ * If an error is returned, some file descriptors may be valid.
+ */
+static int
+get_connect_session_response_fds(struct trans *trans,
+                                 int *display_fd,
+                                 int *chan_fd)
+{
+    int rv;
+    int fd_present;
+
+    // Read the display server file descriptor and guard
+    if ((rv = libipm_msg_in_parse(trans, "b", &fd_present)) != 0)
+    {
+        return rv;
+    }
+    if (fd_present)
+    {
+        if ((rv = libipm_msg_in_parse(trans, "h", display_fd)) != 0)
+        {
+            return rv;
+        }
+    }
+
+    // Read the chansrv file descriptor and guard
+    if ((rv = libipm_msg_in_parse(trans, "b", &fd_present)) != 0)
+    {
+        return rv;
+    }
+    if (fd_present)
+    {
+        if ((rv = libipm_msg_in_parse(trans, "h", chan_fd)) != 0)
+        {
+            return rv;
+        }
+    }
+
+    return 0;
+}
+
+/*****************************************************************************/
+
+int
+scp_get_connect_session_response(struct trans *trans,
+                                 enum scp_sconnect_status *status,
+                                 int *display_fd,
+                                 int *chan_fd)
+{
+    int rv;
+    /* Intermediate values */
+    int32_t i_status;
+
+    /* Set the returned FDs to nonsensical values to stop valid
+     * FDs getting clobbered */
+    *display_fd = -1;
+    *chan_fd = -1;
+
+    if ((rv = libipm_msg_in_parse( trans, "i", &i_status)) == 0)
+    {
+        // Us a helper function to get the file descriptors as this
+        // makes flow control easier.
+        rv = get_connect_session_response_fds(trans, display_fd, chan_fd);
+        if (rv == 0)
+        {
+            *status = (enum scp_sconnect_status)i_status;
+        }
+        else
+        {
+            // Close any fds we did receive to stop leaks
+            if (*display_fd >= 0)
+            {
+                g_file_close(*display_fd);
+                *display_fd = -1;
+            }
+            if (*chan_fd >= 0)
+            {
+                g_file_close(*chan_fd);
+                *chan_fd = -1;
+            }
+        }
     }
 
     return rv;

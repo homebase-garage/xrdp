@@ -1,7 +1,7 @@
 /**
  * xrdp: A Remote Desktop Protocol server.
  *
- * Copyright (C) Jay Sorg 2004-2023
+ * Copyright (C) Jay Sorg 2004-2025
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,24 +18,24 @@
 
 /**
  *
- * @file eicp_process.h
- * @brief eicp (executive initialisation control protocol) handler function
+ * @file display_utils.h
+ * @brief Declaration of utility calls related to display handling
  * @author Matt Burt
- *
  */
 
-#ifndef EICP_PROCESS_H
-#define EICP_PROCESS_H
 
-struct scp_list_item;
+#ifndef DISPLAY_UTILS_H
+#define DISPLAY_UTILS_H
+
+struct set_int;
 
 /**
+ * @brief Gets a free display number
  *
- * @brief Processes an EICP message
- * @param sli the sesman connection
- *
+ * @param Displays already allocated (or being allocated) by sesman
+ * @return next available display, or -1 if none.
  */
 int
-eicp_process(struct scp_list_item *sli);
+display_utils_get_free_display(const struct set_int *alloc_displays);
 
-#endif
+#endif // DISPLAY_UTILS_H

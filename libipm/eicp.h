@@ -45,11 +45,14 @@ enum eicp_msg_code
     E_EICP_SYS_LOGIN_REQUEST,
     E_EICP_SYS_LOGIN_RESPONSE,
 
+    E_EICP_UDS_LOGIN_REQUEST,
+    // No E_EIC_UDS_LOGIN response
+
     E_EICP_LOGOUT_REQUEST,
     // No E_EICP_LOGOUT_RESPONSE
 
-    E_EICP_CREATE_SESSION_REQUEST
-    // No E_EICP_CREATE_SESSION_RESPONSE
+    E_EICP_CREATE_SESSION_REQUEST,
+    E_EICP_CREATE_SESSION_RESPONSE
 };
 
 /* Common facilities */
@@ -204,7 +207,7 @@ eicp_send_sys_login_response(struct trans *trans,
                              int scp_fd);
 
 /**
- * Parses an incoming E_EICP_SYS_LOGIN_RESPONSE (sesexec)
+ * Parses an incoming E_EICP_SYS_LOGIN_RESPONSE (sesman)
  *
  * @param trans EICP transport
  * @param[out] is_logged_in true if the SCP client is logged in
@@ -220,6 +223,37 @@ eicp_get_sys_login_response(struct trans *trans,
                             int *is_logged_in,
                             uid_t *uid,
                             int *scp_fd);
+
+/**
+ * Send an E_EICP_UDS_LOGIN_REQUEST (sesman)
+ *
+ * @param trans EICP transport
+ * @param scp_fd File descriptor attached to the client
+ * @return != 0 for error
+ *
+ * This call is needed if the sesexec process is created after
+ * the UID is known already. It generates no response. It is expected to
+ * succeed, as sesman is expected to have already vetted the caller.
+ *
+ * The file descriptor is closed immediately after it is used by the
+ * recipient.
+ */
+int
+eicp_send_uds_login_request(struct trans *trans,
+                            int scp_fd);
+
+
+/**
+ * Get a E_EICP_UDS_LOGIN_REQUEST (sesexec)
+ *
+ * @param trans EICP transport
+ * @param[out] scp_fd File descriptor attached to the client
+ * @return != 0 for error
+ */
+int
+eicp_get_uds_login_request(struct trans *trans,
+                           int *scp_fd);
+
 
 /**
  * Send an E_EICP_LOGOUT_REQUEST (sesexec)
@@ -238,7 +272,6 @@ eicp_send_logout_request(struct trans *trans);
  * Send an E_EICP_CREATE_SESSION_REQUEST (sesman)
  *
  * @param trans EICP transport
- * @param scp_fd SCP file descriptor from sesman client
  * @param display X display number to use
  * @param type Session type
  * @param width Initial session width
@@ -248,20 +281,17 @@ eicp_send_logout_request(struct trans *trans);
  * @param directory Directory to run the program in. May be ""
  * @return != 0 for error
  *
- * The UID for the session comes from one of two places:-
- * - The UID for a sys login request is used if one has successfully
- *   been executed.
- * - If no sys login request is used, the UID is taken from the scp_fd
+ * The UID for the session must have been set by a previous call.
  *
  * Following a successful request, the session creation can be
  * considered to be underway. The result of this operation is
- * conveyed back to the caller as an ERCP event. The caller must use
- * ercp_trans_from_eicp_trans() on 'trans' to convert the transport to
- * an ERCP transport to receive this (and other) session run-time events.
+ * conveyed back to the caller as one or more ERCP messages. The caller
+ * must use ercp_trans_from_eicp_trans() on 'trans' to convert the
+ * transport to an ERCP transport to receive this (and other) session
+ * run-time events.
  */
 int
 eicp_send_create_session_request(struct trans *trans,
-                                 int scp_fd,
                                  unsigned int display,
                                  enum scp_session_type type,
                                  unsigned short width,
@@ -275,7 +305,6 @@ eicp_send_create_session_request(struct trans *trans,
  * Parse an incoming E_EICP_CREATE_SESSION_REQUEST (sesexec)
  *
  * @param trans EICP transport
- * @param[out] scp_fd SCP file descriptor from sesman client
  * @param[out] display X display number to use
  * @param[out] type Session type
  * @param[out] width Initial session width
@@ -290,7 +319,6 @@ eicp_send_create_session_request(struct trans *trans,
  */
 int
 eicp_get_create_session_request(struct trans *trans,
-                                int *scp_fd,
                                 unsigned int *display,
                                 enum scp_session_type *type,
                                 unsigned short *width,
@@ -298,5 +326,40 @@ eicp_get_create_session_request(struct trans *trans,
                                 unsigned char *bpp,
                                 const char **shell,
                                 const char **directory);
+
+/**
+ * Send an E_EICP_CREATE_SESSION_RESPONSE
+ *
+ * Direction : sesexec -> sesman
+ *
+ * This event is in response to an E_EICP_CREATE_SESSION_REQUEST
+ *
+ * @param trans EICP transport
+ * @param status Status of creation request
+ * @param guid GUID of session
+ * @return != 0 for error
+ */
+int
+eicp_send_create_session_response(struct trans *trans,
+                                  enum scp_screate_status status,
+                                  const struct guid *guid);
+
+
+/**
+ * Parse an E_EICP_CREATE_SESSION_RESPONSE
+ *
+ * Direction : sesexec -> sesman
+ *
+ * This event is in response to an E_EICP_CREATE_SESSION_REQUEST
+ *
+ * @param trans EICP transport
+ * @param[out] status Status of creation request
+ * @param[out] guid GUID of session
+ * @return != 0 for error
+ */
+int
+eicp_get_create_session_response(struct trans *trans,
+                                 enum scp_screate_status *status,
+                                 struct guid *guid);
 
 #endif /* EICP_H */
