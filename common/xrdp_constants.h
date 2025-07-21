@@ -51,8 +51,20 @@
  */
 #define MAX_PEER_DESCSTRLEN (46 + 2 + 1 + 5)
 
-#define INFO_CLIENT_NAME_BYTES  32
+/*
+ * Number of bytes used to send a client name in the client core data
+ * ([MS-RDPBCGR] 2.2.1.3.2). This is 15 characters plus a terminator in
+ * UTF-16
+ */
+#define INFO_CLIENT_NAME_BYTES_UTF16  ((15 + 1) * 2)
 
+/*
+ * Number of bytes needed to store the client name as UTF-8. It is assumed
+ * that the 15 Unicode characters in the name all occupy BMP codepoints
+ * between U+0800 and U+FFFF. These codepoints all need three octets
+ * in UTF-8
+ */
+#define INFO_CLIENT_NAME_BYTES_UTF8 ((3 * 15) + 1)
 /**
  * Maximum length of a string including the mandatory null terminator
  * [MS-RDPBCGR] TS_INFO_PACKET(2.2.1.11.1.1)

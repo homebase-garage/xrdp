@@ -73,9 +73,46 @@ libxrdp_exit(struct xrdp_session *session)
 
 /******************************************************************************/
 int EXPORT_CC
-libxrdp_disconnect(struct xrdp_session *session)
+libxrdp_disconnect(struct xrdp_session *session, int errinfo)
 {
-    return xrdp_rdp_disconnect((struct xrdp_rdp *)session->rdp);
+    int rv = 0;
+    struct trans *trans = NULL;
+    struct xrdp_rdp *rdp = NULL;
+    int early_capability_flags = 0;
+
+    if (session != NULL)
+    {
+        trans = session->trans;
+        rdp = (struct xrdp_rdp *)session->rdp;
+        if (session->client_info != NULL)
+        {
+            early_capability_flags =
+                session->client_info->mcs_early_capability_flags;
+        }
+    }
+
+    if (trans != NULL && trans->status == TRANS_STATUS_UP &&
+            trans->sck >= 0 && rdp != NULL)
+    {
+        /* Only send the error info PDU if the client has
+         * indicated it can receive it */
+        if ((early_capability_flags & RNS_UD_CS_SUPPORT_ERRINFO_PDU) != 0)
+        {
+            rv = xrdp_rdp_send_set_error(rdp, errinfo);
+        }
+
+        if (rv == 0)
+        {
+            rv = xrdp_rdp_send_deactivate(rdp);
+        }
+
+        if (rv == 0)
+        {
+            rv = xrdp_rdp_disconnect(rdp);
+        }
+    }
+
+    return rv;
 }
 
 /******************************************************************************/

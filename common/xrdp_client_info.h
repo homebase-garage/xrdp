@@ -146,7 +146,7 @@ struct xrdp_client_info
     int op2; /* use smaller bitmap header in bitmap cache */
     int desktop_cache;
     int use_compact_packets; /* rdp5 smaller packets */
-    char hostname[32];
+    char client_name[INFO_CLIENT_NAME_BYTES_UTF8];
     int build;
     int keylayout;
     char username[INFO_CLIENT_MAX_CB_LEN];

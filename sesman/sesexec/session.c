@@ -189,7 +189,8 @@ dumpItemsToString(struct list *self, char *outstr, int len)
 /******************************************************************************/
 static void
 start_chansrv(const struct login_info *login_info,
-              const struct session_parameters *s)
+              const struct session_parameters *s,
+              void *closure /* unused */)
 {
     struct list *chansrv_params = list_create();
     const char *exe_path = XRDP_SBIN_PATH "/xrdp-chansrv";
@@ -227,7 +228,8 @@ start_chansrv(const struct login_info *login_info,
 /******************************************************************************/
 static void
 start_window_manager(const struct login_info *login_info,
-                     const struct session_parameters *s)
+                     const struct session_parameters *s,
+                     void *closure /* unused */)
 {
     char text[256];
 
@@ -476,7 +478,8 @@ prepare_xvnc_xserver_params(const struct session_parameters *s,
 /* Either execs the X server, or returns */
 static void
 start_x_server(const struct login_info *login_info,
-               const struct session_parameters *s)
+               const struct session_parameters *s,
+               void *closure /* unused */)
 {
     char authfile[256]; /* The filename for storing xauth information */
     char execvpparams[2048];
@@ -579,10 +582,13 @@ start_x_server(const struct login_info *login_info,
  * Simple helper process to fork a child and log errors */
 static int
 fork_child(
-    void (*runproc)(const struct login_info *, const struct session_parameters *),
+    void (*runproc)(const struct login_info *,
+                    const struct session_parameters *,
+                    void *closure),
     const struct login_info *login_info,
     const struct session_parameters *s,
-    pid_t group_pid)
+    pid_t group_pid,
+    void *closure)
 {
     int pid = g_fork();
     if (pid == 0)
@@ -592,7 +598,7 @@ fork_child(
         {
             (void)g_setpgid(0, group_pid);
         }
-        runproc(login_info, s);
+        runproc(login_info, s, closure);
         g_exit(0);
     }
 
@@ -720,7 +726,7 @@ session_start_wrapped(struct login_info *login_info,
      * without affecting sesexec (and vice-versa). This is particularly
      * important when debugging sesexec as we don't want a SIGINT in
      * the debugger to be passed to the children */
-    display_pid = fork_child(start_x_server, login_info, s, 0);
+    display_pid = fork_child(start_x_server, login_info, s, 0, NULL);
     if (display_pid > 0)
     {
         enum xwait_status xws;
@@ -756,7 +762,7 @@ session_start_wrapped(struct login_info *login_info,
                 s->display);
 
             window_manager_pid = fork_child(start_window_manager,
-                                            login_info, s, display_pid);
+                                            login_info, s, display_pid, NULL);
             if (window_manager_pid < 0)
             {
                 g_sigterm(display_pid);
@@ -770,7 +776,7 @@ session_start_wrapped(struct login_info *login_info,
                     s->display);
 
                 chansrv_pid = fork_child(start_chansrv, login_info,
-                                         s, display_pid);
+                                         s, display_pid, NULL);
 
                 sd->win_mgr = window_manager_pid;
                 sd->x_server = display_pid;
@@ -1129,7 +1135,8 @@ session_send_term(struct session_data *sd, int wait_for_all)
 /******************************************************************************/
 static void
 start_reconnect_script(const struct login_info *login_info,
-                       const struct session_parameters *s)
+                       const struct session_parameters *s,
+                       void *closure)
 {
     env_set_user(login_info->uid, 0, s->display,
                  g_cfg->env_names,
@@ -1139,6 +1146,17 @@ start_reconnect_script(const struct login_info *login_info,
 
     if (g_file_exist(g_cfg->reconnect_sh))
     {
+        /* The 'closure' parameter points to a list of strings
+         * which need to be set in the environment for the reconnect script */
+        if (closure != NULL)
+        {
+            const char **p = (const char **)closure;
+            while (*p != NULL && *(p + 1) != NULL)
+            {
+                (void)g_setenv(*p, *(p + 1), 1);
+                p += 2;
+            }
+        }
         LOG_DEVEL_LEAKING_FDS("reconnect script", 3, -1);
 
         LOG(LOG_LEVEL_INFO,
@@ -1162,10 +1180,11 @@ start_reconnect_script(const struct login_info *login_info,
 /******************************************************************************/
 void
 session_run_reconnect_script(const struct login_info *login_info,
-                             const struct session_data *sd)
+                             const struct session_data *sd,
+                             const char *vars[])
 {
     if (fork_child(start_reconnect_script,
-                   login_info, &sd->params, sd->x_server) < 0)
+                   login_info, &sd->params, sd->x_server, (void *)vars) < 0)
     {
         LOG(LOG_LEVEL_ERROR, "Failed to fork for session reconnection script");
     }

@@ -576,10 +576,13 @@ process_connect_session_request(struct scp_list_item *sli)
     int rv;
     /* Client parameters describing new session */
     struct guid guid;
+    const char *client_ip;
+    const char *client_name;
     unsigned int flags;
     enum scp_sconnect_status status = E_SCP_SCONNECT_OK;
 
-    rv = scp_get_connect_session_request(sli->client_trans, &guid, &flags);
+    rv = scp_get_connect_session_request(sli->client_trans, &guid,
+                                         &client_ip, &client_name, &flags);
 
     if (rv == 0)
     {
@@ -615,6 +618,8 @@ process_connect_session_request(struct scp_list_item *sli)
                 ercp_stat = ercp_send_connect_session_request(
                                 s_item->sesexec_trans,
                                 sli->client_trans->sck,
+                                client_ip,
+                                client_name,
                                 flags);
 
                 if (ercp_stat != 0)

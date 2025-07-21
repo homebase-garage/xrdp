@@ -216,6 +216,8 @@ xrdp_wm_cancel_clicked(struct xrdp_bitmap *wnd)
         {
             if (wnd->wm->pro_layer != 0)
             {
+                wnd->wm->pro_layer->errinfo =
+                    ERRINFO_SERVER_INSUFFICIENT_PRIVILEGES;
                 g_set_wait_obj(wnd->wm->pro_layer->self_term_event);
             }
         }

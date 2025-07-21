@@ -68,6 +68,9 @@ struct session_item
     struct guid guid;
     char start_ip_addr[MAX_PEER_ADDRSTRLEN];
     time_t start_time;
+    char client_ip[MAX_PEER_ADDRSTRLEN];
+    char client_name[INFO_CLIENT_NAME_BYTES_UTF8];
+    time_t last_connect_disconnect;
 };
 
 /**

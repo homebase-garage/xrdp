@@ -28,6 +28,7 @@
 #include "guid.h"
 #include "ms-rdpedisp.h"
 #include "ms-rdpbcgr.h"
+#include "ccp.h"
 #include "scp.h"
 #include <ctype.h>
 #include "xrdp_encoder.h"
@@ -362,7 +363,10 @@ xrdp_mm_get_session_fds(struct xrdp_mm *self)
     }
 
     rv = scp_send_connect_session_request(self->sesman_trans,
-                                          &self->guid, flags);
+                                          &self->guid,
+                                          self->wm->client_info->client_ip,
+                                          self->wm->client_info->client_name,
+                                          flags);
     return rv;
 }
 
@@ -1991,6 +1995,26 @@ xrdp_mm_up_and_running(struct xrdp_mm *self)
     return 0;
 }
 
+/******************************************************************************/
+void
+xrdp_mm_set_fatal(struct xrdp_mm *self, int errinfo)
+{
+    if (self->wm->pro_layer->errinfo == ERRINFO_NONE)
+    {
+        self->wm->pro_layer->errinfo = errinfo;
+    }
+    g_set_wait_obj(self->wm->pro_layer->self_term_event);
+}
+
+/******************************************************************************/
+void
+xrdp_mm_logwnd_fatal(struct xrdp_mm *self, int errinfo)
+{
+    xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO, "Close the log window to exit.");
+    self->wm->pro_layer->errinfo = errinfo;
+    self->wm->fatal_error_in_log_window = 1;
+}
+
 /*****************************************************************************/
 /* open response from client going to channel server */
 static int
@@ -2621,9 +2645,9 @@ xrdp_mm_process_login_response(struct xrdp_mm *self)
             if (self->wm->client_info->require_credentials)
             {
                 /* Credentials had to be specified, but were invalid */
-                g_set_wait_obj(self->wm->pro_layer->self_term_event);
                 LOG(LOG_LEVEL_ERROR, "require_credentials is set, "
                     "but the user could not be logged in");
+                xrdp_mm_set_fatal(self, ERRINFO_SERVER_INSUFFICIENT_PRIVILEGES);
             }
 
             if (server_closed)
@@ -2633,9 +2657,8 @@ xrdp_mm_process_login_response(struct xrdp_mm *self)
                     xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO, "%s",
                                     "Login retry limit reached");
                 }
-                xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO, "%s",
-                                "Close the log window to exit.");
-                self->wm->fatal_error_in_log_window = 1;
+                xrdp_mm_logwnd_fatal(self,
+                                     ERRINFO_SERVER_INSUFFICIENT_PRIVILEGES);
                 /* Transport can be deleted now */
                 self->delete_sesman_trans = 1;
             }
@@ -2717,15 +2740,23 @@ xrdp_mm_process_connect_session_response(struct xrdp_mm *self)
     rv = scp_get_connect_session_response(self->sesman_trans, &status,
                                           &self->sesman_display_fd,
                                           &self->sesman_chansrv_fd);
-    /* Following this response, the sesman trans is closed */
-    self->delete_sesman_trans = 1;
-
-    if (rv == 0)
+    if (rv != 0)
+    {
+        self->delete_sesman_trans = 1;
+    }
+    else
     {
         if (status == E_SCP_SCONNECT_OK)
         {
             xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO,
                             "Got connection details for session");
+
+            /* Convert the sesman transport fron an SCP transport
+             * to a CCP transport */
+            ccp_trans_from_scp_trans(self->sesman_trans,
+                                     xrdp_mm_ccp_data_in,
+                                     self);
+            self->sesman_trans_is_ccp = 1;
 
             /* Carry on with the connect state machine */
             xrdp_mm_connect_sm(self);
@@ -2745,10 +2776,11 @@ xrdp_mm_process_connect_session_response(struct xrdp_mm *self)
             xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO,
                             "Can't create session for user %s - %s",
                             username, buff);
-            xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO, "%s",
-                            "Close the log window to exit.");
-            self->wm->fatal_error_in_log_window = 1;
+            xrdp_mm_logwnd_fatal(self,
+                                 ERRINFO_SERVER_DWM_CRASH);
             xrdp_wm_mod_connect_done(self->wm, 1);
+            // The sesman tranport is now useless to us.
+            self->delete_sesman_trans = 1;
         }
     }
 
@@ -2756,7 +2788,7 @@ xrdp_mm_process_connect_session_response(struct xrdp_mm *self)
 }
 
 /*****************************************************************************/
-/* This is the callback registered for sesman communication replies. */
+/* This is the callback registered for sesman communication replies over SCP */
 static int
 xrdp_mm_scp_data_in(struct trans *trans)
 {
@@ -3389,19 +3421,15 @@ xrdp_mm_connect_sm(struct xrdp_mm *self)
 
     if (!self->mmcs_expecting_msg)
     {
-        /* We don't need the sesman transport anymore */
-        if (self->sesman_trans != NULL)
-        {
-            self->delete_sesman_trans = 1;
-        }
-
         /* Close any uncomsumed file descriptors from sesman */
         close_sesman_file_descriptors(self);
 
         xrdp_wm_mod_connect_done(self->wm, status);
+
         /* Make sure the module is cleaned up if we weren't successful */
         if (status != 0)
         {
+            self->delete_sesman_trans = 1;
             xrdp_mm_module_cleanup(self);
         }
     }
@@ -3776,14 +3804,12 @@ xrdp_mm_draw_dirty(struct xrdp_mm *self)
 int
 xrdp_mm_check_wait_objs(struct xrdp_mm *self)
 {
-    int rv;
+    int rv = 0;
 
     if (self == 0)
     {
         return 0;
     }
-
-    rv = 0;
 
     if (self->sesman_trans != NULL &&
             !self->delete_sesman_trans &&
@@ -3791,20 +3817,31 @@ xrdp_mm_check_wait_objs(struct xrdp_mm *self)
     {
         if (trans_check_wait_objs(self->sesman_trans) != 0)
         {
-            if (self->mmcs_expecting_msg)
+            if (self->sesman_trans_is_ccp)
             {
-                /* The sesman transport has failed with an
-                 * outstanding message */
-                xrdp_wm_log_msg(self->wm, LOG_LEVEL_ERROR,
-                                "Unexpected sesman failure - check sesman log");
-                xrdp_wm_mod_connect_done(self->wm, 1);
+                /* Comms with the sesexec has failed - we have to assume
+                 * the session has failed */
+                xrdp_mm_set_fatal(self, ERRINFO_LOGOFF_BY_USER);
+            }
+            else
+            {
+                /* We're still using the SCP transport for
+                 * pre-connection activities */
+                if (self->mmcs_expecting_msg)
+                {
+                    /* The sesman transport has failed with an
+                     * outstanding message while connecting */
+                    xrdp_wm_log_msg(self->wm, LOG_LEVEL_ERROR, "Unexpected"
+                                    " sesman failure - check sesman log");
+                    xrdp_wm_mod_connect_done(self->wm, 1);
+                }
+                if (self->wm->hide_log_window)
+                {
+                    /* if hide_log_window, this is fatal */
+                    rv = 1;
+                }
             }
             self->delete_sesman_trans = 1;
-            if (self->wm->hide_log_window)
-            {
-                /* if hide_log_window, this is fatal */
-                rv = 1;
-            }
         }
     }
     if (self->delete_sesman_trans)
@@ -3827,9 +3864,12 @@ xrdp_mm_check_wait_objs(struct xrdp_mm *self)
 
     if (self->mod != NULL)
     {
-        if (self->mod->mod_check_wait_objs != NULL)
+        if (self->mod->mod_check_wait_objs != NULL &&
+                self->mod->mod_check_wait_objs(self->mod) != 0)
         {
-            rv = self->mod->mod_check_wait_objs(self->mod);
+            /* Comms with the module has failed - we have to assume
+             * the display server, and hence the session has failed */
+            xrdp_mm_set_fatal(self, ERRINFO_LOGOFF_BY_USER);
         }
     }
 
@@ -3859,7 +3899,7 @@ xrdp_mm_check_wait_objs(struct xrdp_mm *self)
             {
                 if (self->egfx_up)
                 {
-                    rv = xrdp_mm_draw_dirty(self);
+                    rv |= xrdp_mm_draw_dirty(self);
                     xrdp_region_delete(self->wm->screen_dirty_region);
                     self->wm->screen_dirty_region = NULL;
                     self->wm->last_screen_draw_time = now;
@@ -5259,7 +5299,7 @@ xrdp_mm_setup_mod2(struct xrdp_mm *self)
                                  self->wm->screen->height,
                                  self->wm->screen->bpp) != 0)
         {
-            g_set_wait_obj(self->wm->pro_layer->self_term_event); /* kill session */
+            xrdp_mm_set_fatal(self, ERRINFO_SERVER_DWM_CRASH);
         }
     }
 
@@ -5269,7 +5309,7 @@ xrdp_mm_setup_mod2(struct xrdp_mm *self)
         {
             LOG(LOG_LEVEL_ERROR,
                 "Unexpected display value %d setting up module", self->display);
-            g_set_wait_obj(self->wm->pro_layer->self_term_event); /* kill session */
+            xrdp_mm_set_fatal(self, ERRINFO_SERVER_DWM_CRASH);
         }
         else if (self->code == XVNC_SESSION_CODE)
         {
@@ -5285,7 +5325,7 @@ xrdp_mm_setup_mod2(struct xrdp_mm *self)
         {
             LOG(LOG_LEVEL_ERROR,
                 "Unexpected session code %d setting up module", self->code);
-            g_set_wait_obj(self->wm->pro_layer->self_term_event); /* kill session */
+            xrdp_mm_set_fatal(self, ERRINFO_SERVER_DWM_CRASH);
         }
     }
 
@@ -5305,8 +5345,8 @@ xrdp_mm_setup_mod2(struct xrdp_mm *self)
         self->mod->mod_set_param(self->mod, "client_info",
                                  (const char *) (self->wm->session->client_info));
 
-        name = self->wm->session->client_info->hostname;
-        self->mod->mod_set_param(self->mod, "hostname", name);
+        name = self->wm->session->client_info->client_name;
+        self->mod->mod_set_param(self->mod, "client_name", name);
         g_snprintf(text, 255, "%d", self->wm->session->client_info->keylayout);
         self->mod->mod_set_param(self->mod, "keylayout", text);
         if (guid_is_set(&self->guid))

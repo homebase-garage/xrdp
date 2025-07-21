@@ -464,6 +464,8 @@ struct xrdp_mm
     int last_sync_saved;
     int last_sync_key_flags;
     int last_sync_device_flags;
+    /* Whether the sesman_trans is a CCP trans or not */
+    int sesman_trans_is_ccp;
 };
 
 struct xrdp_key_info
@@ -610,6 +612,7 @@ struct xrdp_process
     int status;
     struct trans *server_trans; /* in tcp server mode */
     tbus self_term_event;
+    int errinfo; /* Reason for self_term_event being set */
     struct xrdp_listen *lis_layer; /* owner */
     struct xrdp_session *session;
     /* create these when up and running */

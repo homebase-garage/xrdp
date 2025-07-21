@@ -295,14 +295,14 @@ xrdp_process_main_loop(struct xrdp_process *self)
             }
         }
         /* send disconnect message if possible */
-        libxrdp_disconnect(self->session);
+        libxrdp_disconnect(self->session, self->errinfo);
     }
     else
     {
         LOG(LOG_LEVEL_ERROR, "xrdp_process_main_loop: libxrdp_process_incoming failed");
         /* this will try to send a disconnect,
            maybe should check that connection got far enough */
-        libxrdp_disconnect(self->session);
+        libxrdp_disconnect(self->session, self->errinfo);
     }
     /* Run end in module */
     xrdp_process_mod_end(self);

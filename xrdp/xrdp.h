@@ -503,6 +503,31 @@ xrdp_mm_suppress_output(struct xrdp_mm *self, int suppress,
                         int left, int top, int right, int bottom);
 int
 xrdp_mm_up_and_running(struct xrdp_mm *self);
+
+/**
+ * Ask the xrdp process (or thread) to terminate
+ * @param self xrdp_mm struct
+ * @param errinfo Error code to return to the client
+ *
+ * Execution continues after this call until the main process loop
+ * is reached. This routine could be called multiple times. In this
+ * instance the first code set is passed back to the client.
+ */
+void
+xrdp_mm_set_fatal(struct xrdp_mm *self, int errinfo);
+
+/**
+ * Tell the user via the log window a fatal error has occurred
+ * @param self xrdp_mm struct
+ * @param errinfo Error code to return to the client
+ *
+ * The log window must already contain the fatal error.
+ * When the user presses OK in the log window, the xrdp process
+ * (or thread) is terminated.
+ */
+void
+xrdp_mm_logwnd_fatal(struct xrdp_mm *self, int errinfo);
+
 int
 xrdp_mm_send_unicode_to_chansrv(struct xrdp_mm *self,
                                 int key_down,
@@ -535,4 +560,11 @@ xrdp_mm_egfx_send_planar_bitmap(struct xrdp_mm *self,
                                 struct xrdp_bitmap *bitmap,
                                 struct xrdp_rect *rect,
                                 int surface_id, int x, int y);
+
+/* xrdp_mm_cpp.c */
+
+/* Callback registered for sesman communication replies over CCP */
+int
+xrdp_mm_ccp_data_in(struct trans *trans);
+
 #endif

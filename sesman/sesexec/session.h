@@ -32,7 +32,6 @@
 
 #include "guid.h"
 #include "scp_application_types.h"
-#include "xrdp_constants.h"
 
 struct login_info;
 struct proc_exit_status;
@@ -159,10 +158,18 @@ session_data_free(struct session_data *session_data);
 
 /**
  * Runs the reconnect script for the session
+ * @param login_info Login info for the session
+ * @param sd Session data for the session
+ * @param vars environment variables for the reconnect script
+ *
+ * The vars parameter points to an array of strings in pairs. The
+ * first string in the pair is the name of an environment variable to
+ * set, and the second string is the value
  */
 void
 session_run_reconnect_script(const struct login_info *login_info,
-                             const struct session_data *sd);
+                             const struct session_data *sd,
+                             const char *vars[]);
 
 /**
  * Connects a file descriptor to the display server

@@ -525,6 +525,8 @@ scp_get_create_session_response(struct trans *trans,
 int
 scp_send_connect_session_request(struct trans *trans,
                                  const struct guid *guid,
+                                 const char *client_ip,
+                                 const char *client_name,
                                  unsigned int flags)
 {
     struct libipm_fsb guid_descriptor = { (void *)guid, sizeof(*guid) };
@@ -532,7 +534,7 @@ scp_send_connect_session_request(struct trans *trans,
     return libipm_msg_out_simple_send(
                trans,
                (int)E_SCP_CONNECT_SESSION_REQUEST,
-               "Bu", &guid_descriptor, flags);
+               "Bssu", &guid_descriptor, client_ip, client_name, flags);
 }
 
 /*****************************************************************************/
@@ -540,13 +542,17 @@ scp_send_connect_session_request(struct trans *trans,
 int
 scp_get_connect_session_request(struct trans *trans,
                                 struct guid *guid,
+                                const char **client_ip,
+                                const char **client_name,
                                 unsigned int *flags)
 {
     struct libipm_fsb guid_descriptor = { (void *)guid, sizeof(*guid) };
     /* Intermediate values */
     uint32_t i_flags;
 
-    int rv = libipm_msg_in_parse( trans, "Bu", &guid_descriptor, &i_flags);
+    int rv = libipm_msg_in_parse(trans, "Bssu",
+                                 &guid_descriptor, client_ip, client_name,
+                                 &i_flags);
 
     if (rv == 0)
     {
@@ -737,7 +743,7 @@ scp_send_list_sessions_response(
         rv = libipm_msg_out_simple_send(
                  trans,
                  (int)E_SCP_LIST_SESSIONS_RESPONSE,
-                 "iiuyqqyxis",
+                 "iiuyqqyxisssx",
                  status,
                  info->sid,
                  info->display,
@@ -745,9 +751,12 @@ scp_send_list_sessions_response(
                  info->width,
                  info->height,
                  info->bpp,
-                 info->start_time,
+                 (int64_t)info->start_time,
                  info->uid,
-                 info->start_ip_addr);
+                 info->start_ip_addr,
+                 info->client_ip,
+                 info->client_name,
+                 (int64_t)info->last_connect_disconnect);
     }
 
     return rv;
@@ -785,10 +794,13 @@ scp_get_list_sessions_response(
             int64_t i_start_time;
             int32_t i_uid;
             char *i_start_ip_addr;
+            char *i_client_ip;
+            char *i_client_name;
+            int64_t i_last_connect_disconnect;
 
             rv = libipm_msg_in_parse(
                      trans,
-                     "iuyqqyxis",
+                     "iuyqqyxisssx",
                      &i_sid,
                      &i_display,
                      &i_type,
@@ -797,25 +809,35 @@ scp_get_list_sessions_response(
                      &i_bpp,
                      &i_start_time,
                      &i_uid,
-                     &i_start_ip_addr);
+                     &i_start_ip_addr,
+                     &i_client_ip,
+                     &i_client_name,
+                     &i_last_connect_disconnect);
 
             if (rv == 0)
             {
                 /* Allocate a block of memory large enough for the
                  * structure result, and the strings it contains */
                 unsigned int len = sizeof(struct scp_session_info) +
-                                   g_strlen(i_start_ip_addr) + 1;
+                                   g_strlen(i_start_ip_addr) + 1 +
+                                   g_strlen(i_client_ip) + 1 +
+                                   g_strlen(i_client_name) + 1;
                 if ((p = (struct scp_session_info *)g_malloc(len, 1)) == NULL)
                 {
                     *status = E_SCP_LS_NO_MEMORY;
                 }
                 else
                 {
-                    /* Set up the string pointers in the block to point
-                     * into the memory allocated after the block */
-                    p->start_ip_addr =
+                    /* Set a pointer to access the strings after the block */
+                    char *memptr =
                         (char *)p + sizeof(struct scp_session_info);
-
+#define COPY_STRING(ptr,src) \
+    { \
+        size_t len = strlen(src) + 1; \
+        (ptr) = memptr; \
+        memcpy(memptr, src, len); \
+        memptr += len; \
+    }
                     /* Copy the data over */
                     p->sid = i_sid;
                     p->display = i_display;
@@ -825,7 +847,11 @@ scp_get_list_sessions_response(
                     p->bpp = i_bpp;
                     p->start_time = i_start_time;
                     p->uid = i_uid;
-                    g_strcpy(p->start_ip_addr, i_start_ip_addr);
+                    COPY_STRING(p->start_ip_addr, i_start_ip_addr);
+                    COPY_STRING(p->client_ip, i_client_ip);
+                    COPY_STRING(p->client_name, i_client_name);
+                    p->last_connect_disconnect = i_last_connect_disconnect;
+#undef COPY_STRING
                 }
             }
         }
