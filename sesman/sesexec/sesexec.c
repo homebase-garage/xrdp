@@ -488,7 +488,8 @@ sesexec_main_loop(void)
                 {
                     // xrdp has gone away.
                     LOG(LOG_LEVEL_INFO, "sesexec_main_loop: "
-                        "xrdp has exited");
+                        "xrdp connection has exited (client '%s')",
+                        g_client_name);
 
                     g_client_ip[0] = '\0';
                     g_client_name[0] = '\0';
