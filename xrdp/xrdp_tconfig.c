@@ -225,6 +225,7 @@ tconfig_load_gfx_x264_ct(toml_table_t *tfile, const int connection_type,
                   datum.u.s,
                   sizeof(param[connection_type].preset) - 1);
         free(datum.u.s);
+        datum.u.s = NULL;
     }
     else if (connection_type == 0)
     {
@@ -245,6 +246,7 @@ tconfig_load_gfx_x264_ct(toml_table_t *tfile, const int connection_type,
                   datum.u.s,
                   sizeof(param[connection_type].tune) - 1);
         free(datum.u.s);
+        datum.u.s = NULL;
     }
     else if (connection_type == 0)
     {
@@ -265,6 +267,7 @@ tconfig_load_gfx_x264_ct(toml_table_t *tfile, const int connection_type,
                   datum.u.s,
                   sizeof(param[connection_type].profile) - 1);
         free(datum.u.s);
+        datum.u.s = NULL; // Prevent double-free warning with cppcheck 2.18.0
     }
     else if (connection_type == 0)
     {

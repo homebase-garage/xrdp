@@ -86,6 +86,7 @@ if [ -z "$CPPCHECK_FLAGS" ]; then
     CPPCHECK_FLAGS="--quiet --force --std=c11 --std=c++11 --inline-suppr \
                     --enable=warning --error-exitcode=1 -i third_party \
                     --suppress=uninitMemberVar:ulalaca/ulalaca.cpp \
+                    --suppress=dangerousTypeCast:ulalaca/XrdpStream.template.cpp \
                     --suppress=shiftTooManyBits:libxrdp/xrdp_mppc_enc.c"
 
     # Check for flags added in later versions
