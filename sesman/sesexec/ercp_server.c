@@ -36,6 +36,7 @@
 #include "os_calls.h"
 #include "session.h"
 #include "sesman_config.h"
+#include "string_calls.h"
 #include "trans.h"
 
 #include "ercp.h"
