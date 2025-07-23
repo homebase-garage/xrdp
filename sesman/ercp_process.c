@@ -35,6 +35,7 @@
 #include "ercp.h"
 #include "ercp_process.h"
 #include "session_list.h"
+#include "string_calls.h"
 
 /******************************************************************************/
 static int
