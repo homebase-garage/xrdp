@@ -156,14 +156,14 @@ print_session(const struct scp_session_info *s)
         printf("\tConnection state: connected\n");
         printf("\tConnected client IP: %s\n", s->client_ip);
         printf("\tConnected client name: %s\n", s->client_name);
-        printf("\tConnection start time: %s\n",
+        printf("\tConnection start time: %s",
                ctime(&s->last_connect_disconnect));
     }
     else
     {
         printf("\tConnection state: disconnected\n");
-        printf("\tConnection end time: %s\n",
-               (s->last_connect_disconnect == 0) ? "-" :
+        printf("\tConnection end time: %s",
+               (s->last_connect_disconnect == 0) ? "-\n" :
                ctime(&s->last_connect_disconnect));
     }
     g_free(username);
