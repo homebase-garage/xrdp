@@ -75,6 +75,8 @@ libcommon_la_SOURCES = \
   string_calls.h \
   thread_calls.c \
   thread_calls.h \
+  timers.c \
+  timers.h \
   trans.c \
   trans.h \
   unicode_defines.h \
