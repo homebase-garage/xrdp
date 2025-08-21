@@ -31,6 +31,8 @@
 
 #define CURRENT_MOD_VER 4
 
+struct timers_oneshot;
+
 /* Screen used for ExtendedDesktopSize / Set DesktopSize */
 struct vnc_screen
 {
@@ -188,6 +190,11 @@ struct vnc
     struct vnc_screen_layout server_layout;
     enum vnc_resize_status resize_status;
     enum vnc_resize_support_status resize_supported;
+    /* forwarded resize */
+    // This occurs when the VNC server forwards a resize request
+    // elsewhere (RFB_EDS_REQUEST_FORWARDED)
+    struct timers_oneshot *forward_timer;
+    struct vnc_screen_layout forwarded_layout;
 };
 
 /*
