@@ -38,6 +38,7 @@
 #include "vnc_clip.h"
 #include "rfb.h"
 #include "log.h"
+#include "timers.h"
 #include "trans.h"
 #include "ssl_calls.h"
 #include "string_calls.h"
@@ -51,6 +52,12 @@
 enum
 {
     MSK_EXTENDED_DESKTOP_SIZE = (1 << 0)
+};
+
+enum
+{
+    /** Time to wait for a forwarded resize to complete */
+    FORWARDED_RESIZE_TIMEOUT = 1500  /* milli-seconds */
 };
 
 /******************************************************************************/
@@ -309,7 +316,8 @@ send_set_desktop_size(struct vnc *v, const struct vnc_screen_layout *layout)
         out_uint32_be(s, layout->s[i].flags);
     }
     s_mark_end(s);
-    LOG(LOG_LEVEL_DEBUG, "VNC Sending SetDesktopSize");
+    LOG(LOG_LEVEL_DEBUG, "VNC_RESIZE: Sending SetDesktopSize %dx%d",
+        layout->total_width, layout->total_height);
     error = lib_send_copy(v, s);
     free_stream(s);
 
@@ -954,7 +962,7 @@ skip_encoding(struct vnc *v, int x, int y, int cx, int cy,
         {
             struct vnc_screen_layout layout = {0};
             LOG(LOG_LEVEL_DEBUG,
-                "Skipping RFB_ENC_EXTENDED_DESKTOP_SIZE encoding "
+                "VNC_RESIZE: Skipping RFB_ENC_EXTENDED_DESKTOP_SIZE encoding "
                 "x=%d, y=%d geom=%dx%d",
                 x, y, cx, cy);
             error = read_extended_desktop_size_rect(v, &layout);
@@ -1033,7 +1041,7 @@ find_matching_extended_rect(struct vnc *v,
                         match(x, y, cx, cy))
                 {
                     LOG(LOG_LEVEL_DEBUG,
-                        "VNC matched ExtendedDesktopSize rectangle "
+                        "VNC_RESIZE: VNC matched ExtendedDesktopSize rectangle "
                         "x=%d, y=%d geom=%dx%d",
                         x, y, cx, cy);
                     found = 1;
@@ -1150,6 +1158,18 @@ rect_is_reply_to_us(int x, int y, int cx, int cy)
 }
 
 /**************************************************************************//**
+ * Tests if extended desktop size rect is a general change.
+ *
+ * This happens when we are looking for a layout change that the
+ * VNC server has reported as forwarded to the real desktop.
+ */
+static int
+rect_is_general_change(int x, int y, int cx, int cy)
+{
+    return (x == 0);
+}
+
+/**************************************************************************//**
  * Handles the first framebuffer update from the server
  *
  * This is used to determine if the server supports resizes from
@@ -1249,45 +1269,136 @@ lib_framebuffer_waiting_for_resize_confirm(struct vnc *v)
     {
         if (layout.count > 0)
         {
-            if (response_code == 0)
+            if (response_code == RFB_EDS_REQUEST_FORWARDED)
             {
-                LOG(LOG_LEVEL_DEBUG, "VNC server successfully resized");
-                log_screen_layout(LOG_LEVEL_INFO, "NewLayout", &layout);
-                v->server_layout = layout;
+                LOG(LOG_LEVEL_DEBUG, "VNC_RESIZE: VNC server resize forwarded");
+                log_screen_layout(LOG_LEVEL_INFO, "ForwardedLayout", &layout);
+                v->forward_timer =
+                    timers_oneshot_init(FORWARDED_RESIZE_TIMEOUT);
+                v->forwarded_layout = layout;
             }
             else
             {
-                LOG(LOG_LEVEL_WARNING,
-                    "VNC server resize failed - error code %d [%s]",
-                    response_code,
-                    rfb_get_eds_status_msg(response_code));
-                // This is awkward. The client has asked for a specific size
-                // which we can't support.
-                //
-                // Currently we handle this by queueing a resize to our
-                // supported size, and continuing with the resize state
-                // machine in xrdp_mm.c
-                LOG(LOG_LEVEL_WARNING, "Resizing client to server");
-                error = resize_client_to_server(v, 0);
-            }
+                // The resize has either succeeded or failed
+                if (response_code == RFB_EDS_NO_ERROR)
+                {
+                    LOG(LOG_LEVEL_DEBUG, "VNC_RESIZE:"
+                        " VNC server successfully resized");
+                    log_screen_layout(LOG_LEVEL_INFO, "NewLayout", &layout);
+                    v->server_layout = layout;
+                }
+                else
+                {
+                    LOG(LOG_LEVEL_WARNING,
+                        "VNC server resize failed - error code %d [%s]",
+                        response_code,
+                        rfb_get_eds_status_msg(response_code));
+                    // This is awkward. The client has asked for a
+                    // specific size which we can't support.
+                    //
+                    // Currently we handle this by queueing a resize
+                    // to our supported size, and continuing with the
+                    // resize state machine in xrdp_mm.c
+                    LOG(LOG_LEVEL_WARNING, "Resizing client to server");
+                    error = resize_client_to_server(v, 0);
+                }
 
-            if (error == 0)
-            {
-                // If this resize was requested by the client mid-session
-                // (dynamic resize), we need to tell xrdp_mm that
-                // it's OK to continue with the resize state machine.
-                error = v->server_monitor_resize_done(v);
+                v->resize_status = VRS_DONE;
+                if (error == 0)
+                {
+                    // If this resize was requested by the client mid-session
+                    // (dynamic resize), we need to tell xrdp_mm that
+                    // it's OK to continue with the resize state machine.
+                    error = v->server_monitor_resize_done(v);
+                    if (error == 0)
+                    {
+                        error = send_update_request_for_resize_status(v);
+                    }
+                }
             }
-            v->resize_status = VRS_DONE;
         }
     }
 
+
+    return error;
+}
+
+/**************************************************************************//**
+ * Looks for the forwarded screen layout in a framebuffer update request
+ *
+ * Looks for an ExtendedDesktopSize rectangle following a notification
+ * from the VNC server that the request has been forwarded to the real
+ * desktop. See rfbproto/pfbproto#32 for more info.
+ *
+ * @param v VNC object
+ * @return != 0 for error
+ */
+static int
+lib_framebuffer_look_for_forwarded_layout(struct vnc *v)
+{
+    int error;
+    struct vnc_screen_layout layout = {0};
+    int x = 0;
+    int y = 0;
+
+    error = find_matching_extended_rect(v,
+                                        rect_is_general_change,
+                                        &x,
+                                        &y,
+                                        &layout);
     if (error == 0)
     {
-        error = send_update_request_for_resize_status(v);
+        if (layout.count > 0)
+        {
+            if (vnc_screen_layouts_equal(&layout, &v->forwarded_layout))
+            {
+                LOG(LOG_LEVEL_DEBUG,
+                    "VNC_RESIZE: VNC server forwarded resize complete");
+                free(v->forward_timer);
+                v->forward_timer = NULL;
+                v->server_layout = layout;
+                error = v->server_monitor_resize_done(v);
+                v->resize_status = VRS_DONE;
+            }
+            else
+            {
+                LOG(LOG_LEVEL_DEBUG,
+                    "VNC_RESIZE: Ignored ExtendedDesktopSize %dx%d x=%d y=%d",
+                    layout.total_width, layout.total_height, x, y);
+                // Delay for a little before we send another request for
+                // the size
+                g_sleep(100);
+            }
+
+            error = send_update_request_for_resize_status(v);
+        }
     }
 
     return error;
+}
+
+/******************************************************************************/
+/*
+ * The VNC server has not actioned a forwarded resize request
+ */
+static int
+forward_timer_expired(struct vnc *v)
+{
+    LOG(LOG_LEVEL_WARNING, "VNC server forwarded resize timed out");
+    LOG(LOG_LEVEL_DEBUG,
+        "VNC_RESIZE: VNC server forwarded resize timed out");
+    free(v->forward_timer);
+    v->forward_timer = NULL;
+    v->resize_status = VRS_DONE;
+
+    int rv = v->server_monitor_resize_done(v);
+    if (rv == 0)
+    {
+        LOG(LOG_LEVEL_WARNING, "Resizing client to server");
+        rv = resize_client_to_server(v, 0);
+    }
+
+    return rv;
 }
 
 /******************************************************************************/
@@ -1433,6 +1544,9 @@ lib_framebuffer_update(struct vnc *v)
                 layout.total_height = cy;
                 error = read_extended_desktop_size_rect(v, &layout);
                 /* If this is a reply to a request from us, x == 1 */
+                LOG(LOG_LEVEL_DEBUG,
+                    "VNC_RESIZE: Read ExtendedDesktopSize %dx%d x=%d y=%d",
+                    layout.total_width, layout.total_height, x, y);
                 if (error == 0 && x != 1)
                 {
                     if (!vnc_screen_layouts_equal(&v->server_layout, &layout))
@@ -1574,7 +1688,14 @@ lib_mod_process_message(struct vnc *v, struct stream *s)
                     break;
 
                 case VRS_WAITING_FOR_RESIZE_CONFIRM:
-                    error = lib_framebuffer_waiting_for_resize_confirm(v);
+                    if (v->forward_timer != NULL)
+                    {
+                        error = lib_framebuffer_look_for_forwarded_layout(v);
+                    }
+                    else
+                    {
+                        error = lib_framebuffer_waiting_for_resize_confirm(v);
+                    }
                     break;
 
                 default:
@@ -2533,6 +2654,10 @@ lib_mod_get_wait_objs(struct vnc *v, tbus *read_objs, int *rcount,
             trans_get_wait_objs_rw(v->trans, read_objs, rcount,
                                    write_objs, wcount, timeout);
         }
+
+        // Update timeout with any active timers
+        unsigned int now = g_get_elapsed_ms();
+        timers_oneshot_update_poll(v->forward_timer, now, timeout);
     }
 
     return 0;
@@ -2550,13 +2675,22 @@ lib_mod_check_wait_objs(struct vnc *v)
     {
         if (v->trans != 0)
         {
-            rv = trans_check_wait_objs(v->trans);
-            if (rv != 0)
+            if ((rv = trans_check_wait_objs(v->trans)) != 0)
             {
                 LOG(LOG_LEVEL_ERROR, "VNC server closed connection");
             }
+            else
+            {
+                // Check timers
+                unsigned int now = g_get_elapsed_ms();
+                if (timers_oneshot_get_remaining(v->forward_timer, now) == 0)
+                {
+                    rv = forward_timer_expired(v);
+                }
+            }
         }
     }
+
     return rv;
 }
 

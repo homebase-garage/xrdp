@@ -80,6 +80,18 @@ enum sec_type
 #define RFBPROTO_VER_3_7 MAKE_RFBPROTO_VER(3,7)
 #define RFBPROTO_VER_3_8 MAKE_RFBPROTO_VER(3,8)
 
+/*
+ * ExtendedDesktopSize status codes
+ */
+enum
+{
+    RFB_EDS_NO_ERROR = 0,
+    RFB_EDS_ADMINISTRATIVELY_PROHIBITED = 1,
+    RFB_EDS_OUT_OF_RESOURCES = 2,
+    RFB_EDS_INVALID_SCREEN_LAYOUT = 3,
+    RFB_EDS_REQUEST_FORWARDED = 4
+};
+
 /**
  * Returns an error string for an ExtendedDesktopSize status code
  */

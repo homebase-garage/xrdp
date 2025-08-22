@@ -31,6 +31,7 @@ static const char *eds_status_msg[] =
     /* 1 */ "Resize is administratively prohibited",
     /* 2 */ "Out of resources",
     /* 3 */ "Invalid screen layout",
+    /* 4 */ "Request forwarded",
     /* others */ "Unknown code"
 };
 
