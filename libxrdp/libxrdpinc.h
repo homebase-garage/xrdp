@@ -63,6 +63,9 @@ struct xrdp_rect
     int bottom;
 };
 
+struct xrdp_rdp;
+struct xrdp_orders;
+
 struct xrdp_session
 {
     tintptr id;
@@ -70,8 +73,8 @@ struct xrdp_session
     int (*callback)(intptr_t id, int msg, intptr_t param1, intptr_t param2,
                     intptr_t param3, intptr_t param4);
     int check_for_app_input;
-    void *rdp;
-    void *orders;
+    struct xrdp_rdp *rdp;
+    struct xrdp_orders *orders;
     struct xrdp_client_info *client_info;
     int up_and_running;
     int (*is_term)(void);

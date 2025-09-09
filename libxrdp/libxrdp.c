@@ -49,8 +49,8 @@ libxrdp_init(tbus id, struct trans *trans, const char *xrdp_ini)
         session->xrdp_ini = g_strdup(XRDP_CFG_PATH "/xrdp.ini");
     }
     session->rdp = xrdp_rdp_create(session, trans);
-    session->orders = xrdp_orders_create(session, (struct xrdp_rdp *)session->rdp);
-    session->client_info = &(((struct xrdp_rdp *)session->rdp)->client_info);
+    session->orders = xrdp_orders_create(session, session->rdp);
+    session->client_info = &session->rdp->client_info;
     session->check_for_app_input = 1;
     return session;
 }
@@ -64,8 +64,8 @@ libxrdp_exit(struct xrdp_session *session)
         return 0;
     }
 
-    xrdp_orders_delete((struct xrdp_orders *)session->orders);
-    xrdp_rdp_delete((struct xrdp_rdp *)session->rdp);
+    xrdp_orders_delete(session->orders);
+    xrdp_rdp_delete(session->rdp);
     g_free(session->xrdp_ini);
     g_free(session);
     return 0;
@@ -83,7 +83,7 @@ libxrdp_disconnect(struct xrdp_session *session, int errinfo)
     if (session != NULL)
     {
         trans = session->trans;
-        rdp = (struct xrdp_rdp *)session->rdp;
+        rdp = session->rdp;
         if (session->client_info != NULL)
         {
             early_capability_flags =
@@ -121,7 +121,7 @@ libxrdp_process_incoming(struct xrdp_session *session)
 {
     int rv;
 
-    rv = xrdp_rdp_incoming((struct xrdp_rdp *)(session->rdp));
+    rv = xrdp_rdp_incoming(session->rdp);
     return rv;
 }
 
@@ -195,7 +195,7 @@ libxrdp_process_data(struct xrdp_session *session, struct stream *s)
     int term;
     int dead_lock_counter;
     int do_read;
-    struct xrdp_rdp *rdp;
+    struct xrdp_rdp *rdp = session->rdp;
 
     do_read = s == 0;
     if (do_read && session->up_and_running)
@@ -214,8 +214,6 @@ libxrdp_process_data(struct xrdp_session *session, struct stream *s)
     cont = 1;
     rv = 0;
     dead_lock_counter = 0;
-
-    rdp = (struct xrdp_rdp *) (session->rdp);
 
     while ((cont || !session->up_and_running) && !term)
     {
@@ -344,7 +342,7 @@ libxrdp_send_palette(struct xrdp_session *session, int *palette)
 
     if (session->client_info->use_fast_path & 1) /* fastpath output supported */
     {
-        if (xrdp_rdp_init_fastpath((struct xrdp_rdp *)session->rdp, s) != 0)
+        if (xrdp_rdp_init_fastpath(session->rdp, s) != 0)
         {
             LOG(LOG_LEVEL_ERROR, "libxrdp_send_palette: xrdp_rdp_init_fastpath failed");
             free_stream(s);
@@ -353,7 +351,7 @@ libxrdp_send_palette(struct xrdp_session *session, int *palette)
     }
     else
     {
-        xrdp_rdp_init_data((struct xrdp_rdp *)session->rdp, s);
+        xrdp_rdp_init_data(session->rdp, s);
     }
 
     /* TS_UPDATE_PALETTE_DATA */
@@ -378,7 +376,7 @@ libxrdp_send_palette(struct xrdp_session *session, int *palette)
                   "paletteUpdateData = { updateType %d (UPDATETYPE_PALETTE), "
                   "pad2Octets <ignored>, numberColors 256, "
                   "paletteEntries <omitted from log> }", UPDATETYPE_PALETTE);
-        if (xrdp_rdp_send_fastpath((struct xrdp_rdp *)session->rdp, s,
+        if (xrdp_rdp_send_fastpath(session->rdp, s,
                                    FASTPATH_UPDATETYPE_PALETTE) != 0)
         {
             LOG(LOG_LEVEL_ERROR, "libxrdp_send_palette: xrdp_rdp_send_fastpath failed");
@@ -392,11 +390,9 @@ libxrdp_send_palette(struct xrdp_session *session, int *palette)
                   "updateType %d (UPDATETYPE_PALETTE), pad2Octets <ignored>, "
                   "numberColors 256, paletteEntries <omitted from log>",
                   UPDATETYPE_PALETTE);
-        xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s,
-                           PDUTYPE2_UPDATE);
+        xrdp_rdp_send_data(session->rdp, s, PDUTYPE2_UPDATE);
     }
     free_stream(s);
-
     /* send the orders palette too */
     rv = libxrdp_orders_init(session);
     if (rv == 0)
@@ -419,7 +415,7 @@ libxrdp_send_bell(struct xrdp_session *session)
     make_stream(s);
     init_stream(s, 8192);
 
-    if (xrdp_rdp_init_data((struct xrdp_rdp *)session->rdp, s) != 0)
+    if (xrdp_rdp_init_data(session->rdp, s) != 0)
     {
         LOG(LOG_LEVEL_ERROR, "libxrdp_send_bell: xrdp_rdp_init_data failed");
         free_stream(s);
@@ -432,7 +428,7 @@ libxrdp_send_bell(struct xrdp_session *session)
     LOG_DEVEL(LOG_LEVEL_TRACE, "Sending [MS-RDPBCGR] TS_PLAY_SOUND_PDU_DATA "
               "duration 100 ms, frequency 440 Hz");
 
-    if (xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s, PDUTYPE2_PLAY_SOUND) != 0)
+    if (xrdp_rdp_send_data(session->rdp, s, PDUTYPE2_PLAY_SOUND) != 0)
     {
         LOG(LOG_LEVEL_ERROR, "libxrdp_send_bell: xrdp_rdp_send_data failed");
         free_stream(s);
@@ -511,7 +507,7 @@ libxrdp_send_bitmap(struct xrdp_session *session, int width, int height,
 
             total_bufsize = 0;
             num_updates = 0;
-            xrdp_rdp_init_data((struct xrdp_rdp *)session->rdp, s);
+            xrdp_rdp_init_data(session->rdp, s);
             out_uint16_le(s, UPDATETYPE_BITMAP); /* updateType */
             p_num_updates = s->p;
             out_uint8s(s, 2); /* num_updates set later */
@@ -620,8 +616,7 @@ libxrdp_send_bitmap(struct xrdp_session *session, int width, int height,
                       "rectangles <omitted from log>",
                       UPDATETYPE_BITMAP, num_updates);
 
-            xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s,
-                               PDUTYPE2_UPDATE);
+            xrdp_rdp_send_data(session->rdp, s, PDUTYPE2_UPDATE);
 
             if (total_bufsize > MAX_BITMAP_BUF_SIZE)
             {
@@ -658,7 +653,7 @@ libxrdp_send_bitmap(struct xrdp_session *session, int width, int height,
                 }
 
                 p += server_line_bytes * lines_sending;
-                xrdp_rdp_init_data((struct xrdp_rdp *)session->rdp, s);
+                xrdp_rdp_init_data(session->rdp, s);
                 out_uint16_le(s, UPDATETYPE_BITMAP);
                 out_uint16_le(s, 1); /* num updates */
                 out_uint16_le(s, x);
@@ -728,8 +723,7 @@ libxrdp_send_bitmap(struct xrdp_session *session, int width, int height,
                           "updateType %d (UPDATETYPE_BITMAP), numberRectangles 1, "
                           "rectangles <omitted from log>",
                           UPDATETYPE_BITMAP);
-                xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s,
-                                   PDUTYPE2_UPDATE);
+                xrdp_rdp_send_data(session->rdp, s, PDUTYPE2_UPDATE);
                 i = i + lines_sending;
             }
         }
@@ -747,13 +741,12 @@ libxrdp_send_pointer_system(struct xrdp_session *session, int pointer_type)
 
     make_stream(s);
     init_stream(s, 8192);
-    xrdp_rdp_init_data((struct xrdp_rdp *)(session->rdp), s);
+    xrdp_rdp_init_data(session->rdp, s);
     out_uint16_le(s, TS_PTRMSGTYPE_SYSTEM);
     out_uint16_le(s, 0); /* pad */
     out_uint32_le(s, pointer_type);
     s_mark_end(s);
-    xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s,
-                       PDUTYPE2_POINTER);
+    xrdp_rdp_send_data(session->rdp, s, PDUTYPE2_POINTER);
     free_stream(s);
     return 0;
 }
@@ -811,7 +804,7 @@ libxrdp_send_pointer(struct xrdp_session *session, int cache_idx,
     if (session->client_info->use_fast_path & 1) /* fastpath output supported */
     {
         LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_pointer: fastpath");
-        if (xrdp_rdp_init_fastpath((struct xrdp_rdp *)session->rdp, s) != 0)
+        if (xrdp_rdp_init_fastpath(session->rdp, s) != 0)
         {
             LOG(LOG_LEVEL_ERROR, "libxrdp_send_pointer: xrdp_rdp_init_fastpath failed");
             free_stream(s);
@@ -826,7 +819,7 @@ libxrdp_send_pointer(struct xrdp_session *session, int cache_idx,
     else /* slowpath */
     {
         LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_send_pointer: slowpath");
-        xrdp_rdp_init_data((struct xrdp_rdp *)session->rdp, s);
+        xrdp_rdp_init_data(session->rdp, s);
         if ((session->client_info->pointer_flags & 1) == 0)
         {
             out_uint16_le(s, TS_PTRMSGTYPE_COLOR);
@@ -915,7 +908,7 @@ libxrdp_send_pointer(struct xrdp_session *session, int cache_idx,
                       "xorMaskData <omitted from log>, "
                       "andMaskData <omitted from log> }",
                       cache_idx, x, y, width, height, mask_bytes, data_bytes);
-            if (xrdp_rdp_send_fastpath((struct xrdp_rdp *)session->rdp, s,
+            if (xrdp_rdp_send_fastpath(session->rdp, s,
                                        FASTPATH_UPDATETYPE_COLOR) != 0)
             {
                 LOG(LOG_LEVEL_ERROR, "libxrdp_send_pointer: xrdp_rdp_send_fastpath failed");
@@ -933,7 +926,7 @@ libxrdp_send_pointer(struct xrdp_session *session, int cache_idx,
                       "xorMaskData <omitted from log>, "
                       "andMaskData <omitted from log> }",
                       bpp, cache_idx, x, y, width, height, mask_bytes, data_bytes);
-            if (xrdp_rdp_send_fastpath((struct xrdp_rdp *)session->rdp, s,
+            if (xrdp_rdp_send_fastpath(session->rdp, s,
                                        FASTPATH_UPDATETYPE_POINTER) != 0)
             {
                 LOG(LOG_LEVEL_ERROR, "libxrdp_send_pointer: xrdp_rdp_send_fastpath failed");
@@ -982,7 +975,7 @@ libxrdp_set_pointer(struct xrdp_session *session, int cache_idx)
 
     if (session->client_info->use_fast_path & 1) /* fastpath output supported */
     {
-        if (xrdp_rdp_init_fastpath((struct xrdp_rdp *)session->rdp, s) != 0)
+        if (xrdp_rdp_init_fastpath(session->rdp, s) != 0)
         {
             LOG(LOG_LEVEL_ERROR, "libxrdp_set_pointer: xrdp_rdp_init_fastpath failed");
             free_stream(s);
@@ -991,7 +984,7 @@ libxrdp_set_pointer(struct xrdp_session *session, int cache_idx)
     }
     else
     {
-        xrdp_rdp_init_data((struct xrdp_rdp *)session->rdp, s);
+        xrdp_rdp_init_data(session->rdp, s);
         out_uint16_le(s, TS_PTRMSGTYPE_CACHED);
         out_uint16_le(s, 0); /* pad */
         LOG_DEVEL(LOG_LEVEL_TRACE, "Adding header [MS-RDPBCGR] TS_POINTER_PDU "
@@ -1006,7 +999,7 @@ libxrdp_set_pointer(struct xrdp_session *session, int cache_idx)
     {
         LOG_DEVEL(LOG_LEVEL_TRACE, "Sending [MS-RDPBCGR] TS_FP_CACHEDPOINTERATTRIBUTE "
                   "cachedPointerUpdateData.cacheIndex %d", cache_idx);
-        if (xrdp_rdp_send_fastpath((struct xrdp_rdp *)session->rdp, s,
+        if (xrdp_rdp_send_fastpath(session->rdp, s,
                                    FASTPATH_UPDATETYPE_CACHED) != 0)
         {
             LOG(LOG_LEVEL_ERROR, "libxrdp_set_pointer: xrdp_rdp_send_fastpath failed");
@@ -1018,8 +1011,7 @@ libxrdp_set_pointer(struct xrdp_session *session, int cache_idx)
     {
         LOG_DEVEL(LOG_LEVEL_TRACE, "Sending [MS-RDPBCGR] TS_CACHEDPOINTERATTRIBUTE "
                   "cacheIndex %d", cache_idx);
-        xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s,
-                           PDUTYPE2_POINTER);
+        xrdp_rdp_send_data(session->rdp, s, PDUTYPE2_POINTER);
     }
     free_stream(s);
     return 0;
@@ -1029,21 +1021,21 @@ libxrdp_set_pointer(struct xrdp_session *session, int cache_idx)
 int EXPORT_CC
 libxrdp_orders_init(struct xrdp_session *session)
 {
-    return xrdp_orders_init((struct xrdp_orders *)session->orders);
+    return xrdp_orders_init(session->orders);
 }
 
 /******************************************************************************/
 int EXPORT_CC
 libxrdp_orders_send(struct xrdp_session *session)
 {
-    return xrdp_orders_send((struct xrdp_orders *)session->orders);
+    return xrdp_orders_send(session->orders);
 }
 
 /******************************************************************************/
 int EXPORT_CC
 libxrdp_orders_force_send(struct xrdp_session *session)
 {
-    return xrdp_orders_force_send((struct xrdp_orders *)session->orders);
+    return xrdp_orders_force_send(session->orders);
 }
 
 /******************************************************************************/
@@ -1051,8 +1043,7 @@ int EXPORT_CC
 libxrdp_orders_rect(struct xrdp_session *session, int x, int y,
                     int cx, int cy, int color, struct xrdp_rect *rect)
 {
-    return xrdp_orders_rect((struct xrdp_orders *)session->orders,
-                            x, y, cx, cy, color, rect);
+    return xrdp_orders_rect(session->orders, x, y, cx, cy, color, rect);
 }
 
 /******************************************************************************/
@@ -1061,7 +1052,7 @@ libxrdp_orders_screen_blt(struct xrdp_session *session, int x, int y,
                           int cx, int cy, int srcx, int srcy,
                           int rop, struct xrdp_rect *rect)
 {
-    return xrdp_orders_screen_blt((struct xrdp_orders *)session->orders,
+    return xrdp_orders_screen_blt(session->orders,
                                   x, y, cx, cy, srcx, srcy, rop, rect);
 }
 
@@ -1072,7 +1063,7 @@ libxrdp_orders_pat_blt(struct xrdp_session *session, int x, int y,
                        int fg_color, struct xrdp_brush *brush,
                        struct xrdp_rect *rect)
 {
-    return xrdp_orders_pat_blt((struct xrdp_orders *)session->orders,
+    return xrdp_orders_pat_blt(session->orders,
                                x, y, cx, cy, rop, bg_color, fg_color,
                                brush, rect);
 }
@@ -1083,8 +1074,7 @@ libxrdp_orders_dest_blt(struct xrdp_session *session, int x, int y,
                         int cx, int cy, int rop,
                         struct xrdp_rect *rect)
 {
-    return xrdp_orders_dest_blt((struct xrdp_orders *)session->orders,
-                                x, y, cx, cy, rop, rect);
+    return xrdp_orders_dest_blt(session->orders, x, y, cx, cy, rop, rect);
 }
 
 /******************************************************************************/
@@ -1095,7 +1085,7 @@ libxrdp_orders_line(struct xrdp_session *session, int mix_mode,
                     struct xrdp_pen *pen,
                     struct xrdp_rect *rect)
 {
-    return xrdp_orders_line((struct xrdp_orders *)session->orders,
+    return xrdp_orders_line(session->orders,
                             mix_mode, startx, starty, endx, endy,
                             rop, bg_color, pen, rect);
 }
@@ -1107,7 +1097,7 @@ libxrdp_orders_mem_blt(struct xrdp_session *session, int cache_id,
                        int rop, int srcx, int srcy,
                        int cache_idx, struct xrdp_rect *rect)
 {
-    return xrdp_orders_mem_blt((struct xrdp_orders *)session->orders,
+    return xrdp_orders_mem_blt(session->orders,
                                cache_id, color_table, x, y, cx, cy, rop,
                                srcx, srcy, cache_idx, rect);
 }
@@ -1123,7 +1113,7 @@ libxrdp_orders_composite_blt(struct xrdp_session *session, int srcidx,
                              int width, int height, int dstformat,
                              struct xrdp_rect *rect)
 {
-    return xrdp_orders_composite_blt((struct xrdp_orders *)session->orders,
+    return xrdp_orders_composite_blt(session->orders,
                                      srcidx, srcformat, srcwidth, srcrepeat,
                                      srctransform, mskflags,
                                      mskidx, mskformat, mskwidth, mskrepeat,
@@ -1143,7 +1133,7 @@ libxrdp_orders_text(struct xrdp_session *session,
                     int x, int y, char *data, int data_len,
                     struct xrdp_rect *rect)
 {
-    return xrdp_orders_text((struct xrdp_orders *)session->orders,
+    return xrdp_orders_text(session->orders,
                             font, flags, mixmode, fg_color, bg_color,
                             clip_left, clip_top, clip_right, clip_bottom,
                             box_left, box_top, box_right, box_bottom,
@@ -1155,7 +1145,7 @@ int EXPORT_CC
 libxrdp_orders_send_palette(struct xrdp_session *session, int *palette,
                             int cache_id)
 {
-    return xrdp_orders_send_palette((struct xrdp_orders *)session->orders,
+    return xrdp_orders_send_palette(session->orders,
                                     palette, cache_id);
 }
 
@@ -1165,7 +1155,7 @@ libxrdp_orders_send_raw_bitmap(struct xrdp_session *session,
                                int width, int height, int bpp, char *data,
                                int cache_id, int cache_idx)
 {
-    return xrdp_orders_send_raw_bitmap((struct xrdp_orders *)session->orders,
+    return xrdp_orders_send_raw_bitmap(session->orders,
                                        width, height, bpp, data,
                                        cache_id, cache_idx);
 }
@@ -1176,7 +1166,7 @@ libxrdp_orders_send_bitmap(struct xrdp_session *session,
                            int width, int height, int bpp, char *data,
                            int cache_id, int cache_idx)
 {
-    return xrdp_orders_send_bitmap((struct xrdp_orders *)session->orders,
+    return xrdp_orders_send_bitmap(session->orders,
                                    width, height, bpp, data,
                                    cache_id, cache_idx);
 }
@@ -1187,7 +1177,7 @@ libxrdp_orders_send_font(struct xrdp_session *session,
                          struct xrdp_font_char *font_char,
                          int font_index, int char_index)
 {
-    return xrdp_orders_send_font((struct xrdp_orders *)session->orders,
+    return xrdp_orders_send_font(session->orders,
                                  font_char, font_index, char_index);
 }
 
@@ -1198,7 +1188,7 @@ libxrdp_reset(struct xrdp_session *session)
     LOG_DEVEL(LOG_LEVEL_TRACE, "libxrdp_reset:");
 
     /* this will send any lingering orders */
-    if (xrdp_orders_reset((struct xrdp_orders *)session->orders) != 0)
+    if (xrdp_orders_reset(session->orders) != 0)
     {
         LOG(LOG_LEVEL_ERROR, "libxrdp_reset: xrdp_orders_reset failed");
         return 1;
@@ -1207,7 +1197,7 @@ libxrdp_reset(struct xrdp_session *session)
     /*
      * Stop output from the client during the deactivation-reactivation
      * sequence [MS-RDPBCGR] 1.3.1.3 */
-    xrdp_rdp_suppress_output((struct xrdp_rdp *)session->rdp, 1,
+    xrdp_rdp_suppress_output(session->rdp, 1,
                              XSO_REASON_DEACTIVATE_REACTIVATE, 0, 0, 0, 0);
 
     /* shut down the rdp client
@@ -1216,14 +1206,14 @@ libxrdp_reset(struct xrdp_session *session)
      * otherwise we can send a channel message to the other end while
      * the channels are inactive ([MS-RDPBCGR] 3.2.5.5.1 */
     session->check_for_app_input = 0;
-    if (xrdp_rdp_send_deactivate((struct xrdp_rdp *)session->rdp) != 0)
+    if (xrdp_rdp_send_deactivate(session->rdp) != 0)
     {
         LOG(LOG_LEVEL_ERROR, "libxrdp_reset: xrdp_rdp_send_deactivate failed");
         return 1;
     }
 
     /* this should do the resizing */
-    if (xrdp_caps_send_demand_active((struct xrdp_rdp *)session->rdp) != 0)
+    if (xrdp_caps_send_demand_active(session->rdp) != 0)
     {
         LOG(LOG_LEVEL_ERROR, "libxrdp_reset: xrdp_caps_send_demand_active failed");
         return 1;
@@ -1241,7 +1231,7 @@ libxrdp_orders_send_raw_bitmap2(struct xrdp_session *session,
                                 int width, int height, int bpp, char *data,
                                 int cache_id, int cache_idx)
 {
-    return xrdp_orders_send_raw_bitmap2((struct xrdp_orders *)session->orders,
+    return xrdp_orders_send_raw_bitmap2(session->orders,
                                         width, height, bpp, data,
                                         cache_id, cache_idx);
 }
@@ -1252,7 +1242,7 @@ libxrdp_orders_send_bitmap2(struct xrdp_session *session,
                             int width, int height, int bpp, char *data,
                             int cache_id, int cache_idx, int hints)
 {
-    return xrdp_orders_send_bitmap2((struct xrdp_orders *)session->orders,
+    return xrdp_orders_send_bitmap2(session->orders,
                                     width, height, bpp, data,
                                     cache_id, cache_idx, hints);
 }
@@ -1263,7 +1253,7 @@ libxrdp_orders_send_bitmap3(struct xrdp_session *session,
                             int width, int height, int bpp, char *data,
                             int cache_id, int cache_idx, int hints)
 {
-    return xrdp_orders_send_bitmap3((struct xrdp_orders *)session->orders,
+    return xrdp_orders_send_bitmap3(session->orders,
                                     width, height, bpp, data,
                                     cache_id, cache_idx, hints);
 }
@@ -1299,12 +1289,10 @@ libxrdp_query_channel(struct xrdp_session *session, int channel_id,
                       char *channel_name, int *channel_flags)
 {
     int count = 0;
-    struct xrdp_rdp *rdp = (struct xrdp_rdp *)NULL;
-    struct xrdp_mcs *mcs = (struct xrdp_mcs *)NULL;
+    struct xrdp_rdp *rdp = session->rdp;
+    struct xrdp_mcs *mcs = rdp->sec_layer->mcs_layer;
     struct mcs_channel_item *channel_item = (struct mcs_channel_item *)NULL;
 
-    rdp = (struct xrdp_rdp *)session->rdp;
-    mcs = rdp->sec_layer->mcs_layer;
 
     if (mcs->channel_list == NULL)
     {
@@ -1355,12 +1343,10 @@ libxrdp_get_channel_id(struct xrdp_session *session, const char *name)
 {
     int index = 0;
     int count = 0;
-    struct xrdp_rdp *rdp = NULL;
-    struct xrdp_mcs *mcs = NULL;
+    struct xrdp_rdp *rdp = session->rdp;
+    struct xrdp_mcs *mcs = rdp->sec_layer->mcs_layer;
     struct mcs_channel_item *channel_item = NULL;
 
-    rdp = (struct xrdp_rdp *)session->rdp;
-    mcs = rdp->sec_layer->mcs_layer;
 
     if (mcs->channel_list == NULL)
     {
@@ -1393,14 +1379,11 @@ libxrdp_send_to_channel(struct xrdp_session *session, int channel_id,
                         char *data, int data_len,
                         int total_data_len, int flags)
 {
-    struct xrdp_rdp *rdp = NULL;
-    struct xrdp_sec *sec = NULL;
-    struct xrdp_channel *chan = NULL;
+    struct xrdp_rdp *rdp = session->rdp;
+    struct xrdp_sec *sec = rdp->sec_layer;
+    struct xrdp_channel *chan = sec->chan_layer;
     struct stream *s = NULL;
 
-    rdp = (struct xrdp_rdp *)session->rdp;
-    sec = rdp->sec_layer;
-    chan = sec->chan_layer;
     make_stream(s);
     init_stream(s, data_len + 1024); /* this should be big enough */
 
@@ -1437,12 +1420,10 @@ int
 libxrdp_disable_channel(struct xrdp_session *session, int channel_id,
                         int is_disabled)
 {
-    struct xrdp_rdp *rdp;
-    struct xrdp_mcs *mcs;
+    struct xrdp_rdp *rdp = session->rdp;
+    struct xrdp_mcs *mcs = rdp->sec_layer->mcs_layer;
     struct mcs_channel_item *channel_item;
 
-    rdp = (struct xrdp_rdp *) (session->rdp);
-    mcs = rdp->sec_layer->mcs_layer;
     if (mcs->channel_list == NULL)
     {
         LOG(LOG_LEVEL_ERROR, "Channel list is NULL");
@@ -1466,15 +1447,12 @@ libxrdp_disable_channel(struct xrdp_session *session, int channel_id,
 int
 libxrdp_drdynvc_start(struct xrdp_session *session)
 {
-    struct xrdp_rdp *rdp;
-    struct xrdp_sec *sec;
-    struct xrdp_channel *chan;
-
     LOG_DEVEL(LOG_LEVEL_TRACE, "libxrdp_drdynvc_start:");
 
-    rdp = (struct xrdp_rdp *) (session->rdp);
-    sec = rdp->sec_layer;
-    chan = sec->chan_layer;
+    struct xrdp_rdp *rdp = session->rdp;
+    struct xrdp_sec *sec = rdp->sec_layer;
+    struct xrdp_channel *chan = sec->chan_layer;
+
     return xrdp_channel_drdynvc_start(chan);
 }
 
@@ -1485,15 +1463,12 @@ libxrdp_drdynvc_open(struct xrdp_session *session, const char *name,
                      int flags, struct xrdp_drdynvc_procs *procs,
                      int *chan_id)
 {
-    struct xrdp_rdp *rdp;
-    struct xrdp_sec *sec;
-    struct xrdp_channel *chan;
-
     LOG_DEVEL(LOG_LEVEL_TRACE, "libxrdp_drdynvc_open:");
 
-    rdp = (struct xrdp_rdp *) (session->rdp);
-    sec = rdp->sec_layer;
-    chan = sec->chan_layer;
+    struct xrdp_rdp *rdp = session->rdp;
+    struct xrdp_sec *sec = rdp->sec_layer;
+    struct xrdp_channel *chan = sec->chan_layer;
+
     return xrdp_channel_drdynvc_open(chan, name, flags, procs, chan_id);
 }
 
@@ -1501,15 +1476,12 @@ libxrdp_drdynvc_open(struct xrdp_session *session, const char *name,
 int
 libxrdp_drdynvc_close(struct xrdp_session *session, int chan_id)
 {
-    struct xrdp_rdp *rdp;
-    struct xrdp_sec *sec;
-    struct xrdp_channel *chan;
-
     LOG_DEVEL(LOG_LEVEL_TRACE, "libxrdp_drdynvc_close:");
 
-    rdp = (struct xrdp_rdp *) (session->rdp);
-    sec = rdp->sec_layer;
-    chan = sec->chan_layer;
+    struct xrdp_rdp *rdp = session->rdp;
+    struct xrdp_sec *sec = rdp->sec_layer;
+    struct xrdp_channel *chan = sec->chan_layer;
+
     return xrdp_channel_drdynvc_close(chan, chan_id);
 }
 
@@ -1519,15 +1491,12 @@ libxrdp_drdynvc_data_first(struct xrdp_session *session, int chan_id,
                            const char *data, int data_bytes,
                            int total_data_bytes)
 {
-    struct xrdp_rdp *rdp;
-    struct xrdp_sec *sec;
-    struct xrdp_channel *chan;
-
     LOG_DEVEL(LOG_LEVEL_TRACE, "libxrdp_drdynvc_data_first:");
 
-    rdp = (struct xrdp_rdp *) (session->rdp);
-    sec = rdp->sec_layer;
-    chan = sec->chan_layer;
+    struct xrdp_rdp *rdp = session->rdp;
+    struct xrdp_sec *sec = rdp->sec_layer;
+    struct xrdp_channel *chan = sec->chan_layer;
+
     return xrdp_channel_drdynvc_data_first(chan, chan_id, data, data_bytes,
                                            total_data_bytes);
 }
@@ -1537,15 +1506,12 @@ int
 libxrdp_drdynvc_data(struct xrdp_session *session, int chan_id,
                      const char *data, int data_bytes)
 {
-    struct xrdp_rdp *rdp;
-    struct xrdp_sec *sec;
-    struct xrdp_channel *chan;
-
     LOG_DEVEL(LOG_LEVEL_TRACE, "libxrdp_drdynvc_data:");
 
-    rdp = (struct xrdp_rdp *) (session->rdp);
-    sec = rdp->sec_layer;
-    chan = sec->chan_layer;
+    struct xrdp_rdp *rdp = session->rdp;
+    struct xrdp_sec *sec = rdp->sec_layer;
+    struct xrdp_channel *chan = sec->chan_layer;
+
     return xrdp_channel_drdynvc_data(chan, chan_id, data, data_bytes);
 }
 
@@ -1555,7 +1521,7 @@ libxrdp_orders_send_brush(struct xrdp_session *session,
                           int width, int height, int bpp, int type,
                           int size, char *data, int cache_id)
 {
-    return xrdp_orders_send_brush((struct xrdp_orders *)session->orders,
+    return xrdp_orders_send_brush(session->orders,
                                   width, height, bpp, type, size, data,
                                   cache_id);
 }
@@ -1566,8 +1532,7 @@ libxrdp_orders_send_create_os_surface(struct xrdp_session *session, int id,
                                       int width, int height,
                                       struct list *del_list)
 {
-    return xrdp_orders_send_create_os_surface
-           ((struct xrdp_orders *)(session->orders), id,
+    return xrdp_orders_send_create_os_surface(session->orders, id,
             width, height, del_list);
 }
 
@@ -1575,8 +1540,7 @@ libxrdp_orders_send_create_os_surface(struct xrdp_session *session, int id,
 int EXPORT_CC
 libxrdp_orders_send_switch_os_surface(struct xrdp_session *session, int id)
 {
-    return xrdp_orders_send_switch_os_surface
-           ((struct xrdp_orders *)(session->orders), id);
+    return xrdp_orders_send_switch_os_surface(session->orders, id);
 }
 
 /*****************************************************************************/
@@ -1585,10 +1549,7 @@ libxrdp_window_new_update(struct xrdp_session *session, int window_id,
                           struct rail_window_state_order *window_state,
                           int flags)
 {
-    struct xrdp_orders *orders;
-
-    orders = (struct xrdp_orders *)(session->orders);
-    return xrdp_orders_send_window_new_update(orders, window_id,
+    return xrdp_orders_send_window_new_update(session->orders, window_id,
             window_state, flags);
 }
 
@@ -1596,10 +1557,7 @@ libxrdp_window_new_update(struct xrdp_session *session, int window_id,
 int EXPORT_CC
 libxrdp_window_delete(struct xrdp_session *session, int window_id)
 {
-    struct xrdp_orders *orders;
-
-    orders = (struct xrdp_orders *)(session->orders);
-    return xrdp_orders_send_window_delete(orders, window_id);
+    return xrdp_orders_send_window_delete(session->orders, window_id);
 }
 
 /*****************************************************************************/
@@ -1608,11 +1566,9 @@ libxrdp_window_icon(struct xrdp_session *session, int window_id,
                     int cache_entry, int cache_id,
                     struct rail_icon_info *icon_info, int flags)
 {
-    struct xrdp_orders *orders;
-
-    orders = (struct xrdp_orders *)(session->orders);
-    return xrdp_orders_send_window_icon(orders, window_id, cache_entry,
-                                        cache_id, icon_info, flags);
+    return xrdp_orders_send_window_icon(session->orders, window_id,
+                                        cache_entry, cache_id,
+                                        icon_info, flags);
 }
 
 /*****************************************************************************/
@@ -1621,11 +1577,8 @@ libxrdp_window_cached_icon(struct xrdp_session *session, int window_id,
                            int cache_entry, int cache_id,
                            int flags)
 {
-    struct xrdp_orders *orders;
-
-    orders = (struct xrdp_orders *)(session->orders);
-    return xrdp_orders_send_window_cached_icon(orders, window_id, cache_entry,
-            cache_id, flags);
+    return xrdp_orders_send_window_cached_icon(session->orders, window_id,
+            cache_entry, cache_id, flags);
 }
 
 /*****************************************************************************/
@@ -1635,11 +1588,8 @@ libxrdp_notify_new_update(struct xrdp_session *session,
                           struct rail_notify_state_order *notify_state,
                           int flags)
 {
-    struct xrdp_orders *orders;
-
-    orders = (struct xrdp_orders *)(session->orders);
-    return xrdp_orders_send_notify_new_update(orders, window_id, notify_id,
-            notify_state, flags);
+    return xrdp_orders_send_notify_new_update(session->orders, window_id,
+            notify_id, notify_state, flags);
 }
 
 /*****************************************************************************/
@@ -1647,10 +1597,8 @@ int
 libxrdp_notify_delete(struct xrdp_session *session,
                       int window_id, int notify_id)
 {
-    struct xrdp_orders *orders;
-
-    orders = (struct xrdp_orders *)(session->orders);
-    return xrdp_orders_send_notify_delete(orders, window_id, notify_id);
+    return xrdp_orders_send_notify_delete(session->orders, window_id,
+                                          notify_id);
 }
 
 /*****************************************************************************/
@@ -1659,10 +1607,7 @@ libxrdp_monitored_desktop(struct xrdp_session *session,
                           struct rail_monitored_desktop_order *mdo,
                           int flags)
 {
-    struct xrdp_orders *orders;
-
-    orders = (struct xrdp_orders *)(session->orders);
-    return xrdp_orders_send_monitored_desktop(orders, mdo, flags);
+    return xrdp_orders_send_monitored_desktop(session->orders, mdo, flags);
 }
 
 /*****************************************************************************/
@@ -1674,11 +1619,9 @@ libxrdp_codec_jpeg_compress(struct xrdp_session *session,
                             int cx, int cy, int quality,
                             char *out_data, int *io_len)
 {
-    struct xrdp_orders *orders;
     void *jpeg_han;
 
-    orders = (struct xrdp_orders *)(session->orders);
-    jpeg_han = orders->jpeg_han;
+    jpeg_han = session->orders->jpeg_han;
     return xrdp_codec_jpeg_compress(jpeg_han, format, inp_data,
                                     width, height, stride, x, y,
                                     cx, cy, quality, out_data, io_len);
@@ -1695,7 +1638,7 @@ libxrdp_fastpath_send_surface(struct xrdp_session *session,
 {
     struct stream ls;
     struct stream *s;
-    struct xrdp_rdp *rdp;
+    struct xrdp_rdp *rdp = session->rdp;
     int sec_bytes;
     int rdp_bytes;
     int max_bytes;
@@ -1712,7 +1655,6 @@ libxrdp_fastpath_send_surface(struct xrdp_session *session,
     {
         max_bytes = 32 * 1024;
     }
-    rdp = (struct xrdp_rdp *) (session->rdp);
     rdp_bytes = xrdp_rdp_get_fastpath_bytes(rdp);
     sec_bytes = xrdp_sec_get_fastpath_bytes(rdp->sec_layer);
     cmd_bytes = 10 + 12;
@@ -1780,7 +1722,7 @@ libxrdp_fastpath_send_frame_marker(struct xrdp_session *session,
                                    int frame_action, int frame_id)
 {
     struct stream *s;
-    struct xrdp_rdp *rdp;
+    struct xrdp_rdp *rdp = session->rdp;
 
     LOG_DEVEL(LOG_LEVEL_DEBUG, "libxrdp_fastpath_send_frame_marker:");
     if ((session->client_info->use_fast_path & 1) == 0)
@@ -1793,7 +1735,6 @@ libxrdp_fastpath_send_frame_marker(struct xrdp_session *session,
         LOG(LOG_LEVEL_ERROR, "Fastpath frame acks is disabled");
         return 1;
     }
-    rdp = (struct xrdp_rdp *) (session->rdp);
     make_stream(s);
     init_stream(s, 8192);
     xrdp_rdp_init_fastpath(rdp, s);
@@ -1822,10 +1763,7 @@ int EXPORT_CC
 libxrdp_send_session_info(struct xrdp_session *session, const char *data,
                           int data_bytes)
 {
-    struct xrdp_rdp *rdp;
-
-    rdp = (struct xrdp_rdp *) (session->rdp);
-    return xrdp_rdp_send_session_info(rdp, data, data_bytes);
+    return xrdp_rdp_send_session_info(session->rdp, data, data_bytes);
 }
 
 /*****************************************************************************/
