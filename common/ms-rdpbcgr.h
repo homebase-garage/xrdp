@@ -527,17 +527,16 @@
 #define FASTPATH_INPUT_KBDFLAGS_EXTENDED1   0x04
 
 /* Slow-Path Graphics Update: updateType (2.2.9.1.1.3.1) */
-/* TODO: to be renamed */
-#define RDP_UPDATE_ORDERS              0
-#define RDP_UPDATE_BITMAP              1
-#define RDP_UPDATE_PALETTE             2
-#define RDP_UPDATE_SYNCHRONIZE         3
+#define UPDATETYPE_ORDERS              0
+#define UPDATETYPE_BITMAP              1
+#define UPDATETYPE_PALETTE             2
+#define UPDATETYPE_SYNCHRONIZE         3
 
 #define GRAPHICS_UPDATE_TYPE_TO_STR(type) \
-    ((type) == RDP_UPDATE_ORDERS ? "RDP_UPDATE_ORDERS" : \
-     (type) == RDP_UPDATE_BITMAP ? "RDP_UPDATE_BITMAP" : \
-     (type) == RDP_UPDATE_PALETTE ? "RDP_UPDATE_PALETTE" : \
-     (type) == RDP_UPDATE_SYNCHRONIZE ? "RDP_UPDATE_SYNCHRONIZE" : \
+    ((type) == UPDATETYPE_ORDERS ? "UPDATETYPE_ORDERS" : \
+     (type) == UPDATETYPE_BITMAP ? "UPDATETYPE_BITMAP" : \
+     (type) == UPDATETYPE_PALETTE ? "UPDATETYPE_PALETTE" : \
+     (type) == UPDATETYPE_SYNCHRONIZE ? "UPDATETYPE_SYNCHRONIZE" : \
      "unknown" \
     )
 

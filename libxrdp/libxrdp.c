@@ -357,7 +357,7 @@ libxrdp_send_palette(struct xrdp_session *session, int *palette)
     }
 
     /* TS_UPDATE_PALETTE_DATA */
-    out_uint16_le(s, RDP_UPDATE_PALETTE); /* updateType */
+    out_uint16_le(s, UPDATETYPE_PALETTE); /* updateType */
     out_uint16_le(s, 0);   /* pad2Octets */
     out_uint16_le(s, 256); /* # of colors (low-bytes) */
     out_uint16_le(s, 0);   /* # of colors (high-bytes) */
@@ -377,7 +377,7 @@ libxrdp_send_palette(struct xrdp_session *session, int *palette)
         LOG_DEVEL(LOG_LEVEL_TRACE, "Sending [MS-RDPBCGR] TS_FP_UPDATE_PALETTE "
                   "paletteUpdateData = { updateType %d (UPDATETYPE_PALETTE), "
                   "pad2Octets <ignored>, numberColors 256, "
-                  "paletteEntries <omitted from log> }", RDP_UPDATE_PALETTE);
+                  "paletteEntries <omitted from log> }", UPDATETYPE_PALETTE);
         if (xrdp_rdp_send_fastpath((struct xrdp_rdp *)session->rdp, s,
                                    FASTPATH_UPDATETYPE_PALETTE) != 0)
         {
@@ -391,7 +391,7 @@ libxrdp_send_palette(struct xrdp_session *session, int *palette)
         LOG_DEVEL(LOG_LEVEL_TRACE, "Sending [MS-RDPBCGR] TS_UPDATE_PALETTE_DATA "
                   "updateType %d (UPDATETYPE_PALETTE), pad2Octets <ignored>, "
                   "numberColors 256, paletteEntries <omitted from log>",
-                  RDP_UPDATE_PALETTE);
+                  UPDATETYPE_PALETTE);
         xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s,
                            PDUTYPE2_UPDATE);
     }
@@ -512,7 +512,7 @@ libxrdp_send_bitmap(struct xrdp_session *session, int width, int height,
             total_bufsize = 0;
             num_updates = 0;
             xrdp_rdp_init_data((struct xrdp_rdp *)session->rdp, s);
-            out_uint16_le(s, RDP_UPDATE_BITMAP); /* updateType */
+            out_uint16_le(s, UPDATETYPE_BITMAP); /* updateType */
             p_num_updates = s->p;
             out_uint8s(s, 2); /* num_updates set later */
 
@@ -618,7 +618,7 @@ libxrdp_send_bitmap(struct xrdp_session *session, int width, int height,
             LOG_DEVEL(LOG_LEVEL_TRACE, "Sending [MS-RDPBCGR] TS_UPDATE_BITMAP_DATA "
                       "updateType %d (UPDATETYPE_BITMAP), numberRectangles %d, "
                       "rectangles <omitted from log>",
-                      RDP_UPDATE_BITMAP, num_updates);
+                      UPDATETYPE_BITMAP, num_updates);
 
             xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s,
                                PDUTYPE2_UPDATE);
@@ -659,7 +659,7 @@ libxrdp_send_bitmap(struct xrdp_session *session, int width, int height,
 
                 p += server_line_bytes * lines_sending;
                 xrdp_rdp_init_data((struct xrdp_rdp *)session->rdp, s);
-                out_uint16_le(s, RDP_UPDATE_BITMAP);
+                out_uint16_le(s, UPDATETYPE_BITMAP);
                 out_uint16_le(s, 1); /* num updates */
                 out_uint16_le(s, x);
                 out_uint16_le(s, y + i);
@@ -727,7 +727,7 @@ libxrdp_send_bitmap(struct xrdp_session *session, int width, int height,
                 LOG_DEVEL(LOG_LEVEL_TRACE, "Sending [MS-RDPBCGR] TS_UPDATE_BITMAP_DATA "
                           "updateType %d (UPDATETYPE_BITMAP), numberRectangles 1, "
                           "rectangles <omitted from log>",
-                          RDP_UPDATE_BITMAP);
+                          UPDATETYPE_BITMAP);
                 xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s,
                                    PDUTYPE2_UPDATE);
                 i = i + lines_sending;

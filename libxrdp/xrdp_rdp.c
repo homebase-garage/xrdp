@@ -890,7 +890,7 @@ xrdp_rdp_send_data_update_sync(struct xrdp_rdp *self)
             free_stream(s);
             return 1;
         }
-        out_uint16_le(s, RDP_UPDATE_SYNCHRONIZE); /* updateType */
+        out_uint16_le(s, UPDATETYPE_SYNCHRONIZE); /* updateType */
         out_uint16_le(s, 0); /* pad */
 
     }
@@ -912,8 +912,8 @@ xrdp_rdp_send_data_update_sync(struct xrdp_rdp *self)
     {
         LOG_DEVEL(LOG_LEVEL_TRACE, "Sending [MS-RDPBCGR] TS_UPDATE_SYNC "
                   "updateType %s (%d)",
-                  GRAPHICS_UPDATE_TYPE_TO_STR(RDP_UPDATE_SYNCHRONIZE),
-                  RDP_UPDATE_SYNCHRONIZE);
+                  GRAPHICS_UPDATE_TYPE_TO_STR(UPDATETYPE_SYNCHRONIZE),
+                  UPDATETYPE_SYNCHRONIZE);
         if (xrdp_rdp_send_data(self, s, PDUTYPE2_UPDATE) != 0)
         {
             LOG(LOG_LEVEL_ERROR, "Sending [MS-RDPBCGR] TS_UPDATE_SYNC failed");
