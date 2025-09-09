@@ -393,7 +393,7 @@ libxrdp_send_palette(struct xrdp_session *session, int *palette)
                   "numberColors 256, paletteEntries <omitted from log>",
                   RDP_UPDATE_PALETTE);
         xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s,
-                           RDP_DATA_PDU_UPDATE);
+                           PDUTYPE2_UPDATE);
     }
     free_stream(s);
 
@@ -432,7 +432,7 @@ libxrdp_send_bell(struct xrdp_session *session)
     LOG_DEVEL(LOG_LEVEL_TRACE, "Sending [MS-RDPBCGR] TS_PLAY_SOUND_PDU_DATA "
               "duration 100 ms, frequency 440 Hz");
 
-    if (xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s, RDP_DATA_PDU_PLAY_SOUND) != 0)
+    if (xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s, PDUTYPE2_PLAY_SOUND) != 0)
     {
         LOG(LOG_LEVEL_ERROR, "libxrdp_send_bell: xrdp_rdp_send_data failed");
         free_stream(s);
@@ -621,7 +621,7 @@ libxrdp_send_bitmap(struct xrdp_session *session, int width, int height,
                       RDP_UPDATE_BITMAP, num_updates);
 
             xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s,
-                               RDP_DATA_PDU_UPDATE);
+                               PDUTYPE2_UPDATE);
 
             if (total_bufsize > MAX_BITMAP_BUF_SIZE)
             {
@@ -729,7 +729,7 @@ libxrdp_send_bitmap(struct xrdp_session *session, int width, int height,
                           "rectangles <omitted from log>",
                           RDP_UPDATE_BITMAP);
                 xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s,
-                                   RDP_DATA_PDU_UPDATE);
+                                   PDUTYPE2_UPDATE);
                 i = i + lines_sending;
             }
         }
@@ -753,7 +753,7 @@ libxrdp_send_pointer_system(struct xrdp_session *session, int pointer_type)
     out_uint32_le(s, pointer_type);
     s_mark_end(s);
     xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s,
-                       RDP_DATA_PDU_POINTER);
+                       PDUTYPE2_POINTER);
     free_stream(s);
     return 0;
 }
@@ -965,7 +965,7 @@ libxrdp_send_pointer(struct xrdp_session *session, int cache_idx,
                       bpp, cache_idx, x, y, width, height, mask_bytes, data_bytes);
         }
         xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s,
-                           RDP_DATA_PDU_POINTER);
+                           PDUTYPE2_POINTER);
     }
     free_stream(s);
     return 0;
@@ -1019,7 +1019,7 @@ libxrdp_set_pointer(struct xrdp_session *session, int cache_idx)
         LOG_DEVEL(LOG_LEVEL_TRACE, "Sending [MS-RDPBCGR] TS_CACHEDPOINTERATTRIBUTE "
                   "cacheIndex %d", cache_idx);
         xrdp_rdp_send_data((struct xrdp_rdp *)session->rdp, s,
-                           RDP_DATA_PDU_POINTER);
+                           PDUTYPE2_POINTER);
     }
     free_stream(s);
     return 0;

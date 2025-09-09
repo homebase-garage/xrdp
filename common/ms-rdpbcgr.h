@@ -449,21 +449,21 @@
     )
 
 /* Share Data Header: pduType2 (2.2.8.1.1.1.2) */
-/* TODO: to be renamed */
-#define RDP_DATA_PDU_UPDATE            2   /* PDUTYPE2_UPDATE */
-#define RDP_DATA_PDU_CONTROL           20
-#define RDP_DATA_PDU_POINTER           27
-#define RDP_DATA_PDU_INPUT             28
-#define RDP_DATA_PDU_SYNCHRONISE       31
+#define PDUTYPE2_UPDATE                2
+#define PDUTYPE2_CONTROL               20
+#define PDUTYPE2_POINTER               27
+#define PDUTYPE2_INPUT                 28
+#define PDUTYPE2_SYNCHRONISE           31
 #define PDUTYPE2_REFRESH_RECT          33
-#define RDP_DATA_PDU_PLAY_SOUND        34
+#define PDUTYPE2_PLAY_SOUND            34
 #define PDUTYPE2_SUPPRESS_OUTPUT       35
 #define PDUTYPE2_SHUTDOWN_REQUEST      36
 #define PDUTYPE2_SHUTDOWN_DENIED       37
-#define RDP_DATA_PDU_LOGON             38
-#define RDP_DATA_PDU_FONT2             39
-#define RDP_DATA_PDU_DISCONNECT        47
+#define PDUTYPE2_SAVE_SESSION_INFO     38
+#define PDUTYPE2_FONTLIST              39
+#define PDUTYPE2_SET_ERROR_INFO_PDU    47
 #define PDUTYPE2_MONITOR_LAYOUT_PDU    55
+#define PDUTYPE2_FRAME_ACKNOWLEDGE     56 /* From [MS-RDPRFX] */
 
 /* TS_SECURITY_HEADER: flags (2.2.8.1.1.2.1) */
 #define SEC_EXCHANGE_PKT               0x0001
