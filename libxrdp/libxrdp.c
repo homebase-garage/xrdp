@@ -748,7 +748,7 @@ libxrdp_send_pointer_system(struct xrdp_session *session, int pointer_type)
     make_stream(s);
     init_stream(s, 8192);
     xrdp_rdp_init_data((struct xrdp_rdp *)(session->rdp), s);
-    out_uint16_le(s, RDP_POINTER_SYSTEM);
+    out_uint16_le(s, TS_PTRMSGTYPE_SYSTEM);
     out_uint16_le(s, 0); /* pad */
     out_uint32_le(s, pointer_type);
     s_mark_end(s);
@@ -829,19 +829,19 @@ libxrdp_send_pointer(struct xrdp_session *session, int cache_idx,
         xrdp_rdp_init_data((struct xrdp_rdp *)session->rdp, s);
         if ((session->client_info->pointer_flags & 1) == 0)
         {
-            out_uint16_le(s, RDP_POINTER_COLOR);
+            out_uint16_le(s, TS_PTRMSGTYPE_COLOR);
             out_uint16_le(s, 0); /* pad */
             LOG_DEVEL(LOG_LEVEL_TRACE, "Adding header [MS-RDPBCGR] TS_POINTER_PDU "
                       "messageType %d (TS_PTRMSGTYPE_COLOR), pad2Octets <ignored>",
-                      RDP_POINTER_COLOR);
+                      TS_PTRMSGTYPE_COLOR);
         }
         else
         {
-            out_uint16_le(s, RDP_POINTER_POINTER);
+            out_uint16_le(s, TS_PTRMSGTYPE_POINTER);
             out_uint16_le(s, 0); /* pad */
             LOG_DEVEL(LOG_LEVEL_TRACE, "Adding header [MS-RDPBCGR] TS_POINTER_PDU "
                       "messageType %d (TS_PTRMSGTYPE_POINTER), pad2Octets <ignored>",
-                      RDP_POINTER_POINTER);
+                      TS_PTRMSGTYPE_POINTER);
 
             out_uint16_le(s, bpp); /* TS_POINTERATTRIBUTE -> xorBpp */
         }
@@ -992,11 +992,11 @@ libxrdp_set_pointer(struct xrdp_session *session, int cache_idx)
     else
     {
         xrdp_rdp_init_data((struct xrdp_rdp *)session->rdp, s);
-        out_uint16_le(s, RDP_POINTER_CACHED);
+        out_uint16_le(s, TS_PTRMSGTYPE_CACHED);
         out_uint16_le(s, 0); /* pad */
         LOG_DEVEL(LOG_LEVEL_TRACE, "Adding header [MS-RDPBCGR] TS_POINTER_PDU "
                   "messageType %d (TS_PTRMSGTYPE_CACHED), pad2Octets <ignored>",
-                  RDP_POINTER_CACHED);
+                  TS_PTRMSGTYPE_CACHED);
     }
 
     out_uint16_le(s, cache_idx); /* cache_idx */

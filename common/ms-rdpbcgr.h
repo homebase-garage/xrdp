@@ -542,16 +542,18 @@
     )
 
 /* Server Pointer Update PDU: messageType (2.2.9.1.1.4) */
-/* TODO: to be renamed */
-#define RDP_POINTER_SYSTEM             1 /* TS_PTRMSGTYPE_SYSTEM */
-#define RDP_POINTER_MOVE               3
-#define RDP_POINTER_COLOR              6
-#define RDP_POINTER_CACHED             7
-#define RDP_POINTER_POINTER            8
+#define TS_PTRMSGTYPE_SYSTEM           1
+#define TS_PTRMSGTYPE_POSITION         3
+#define TS_PTRMSGTYPE_COLOR            6
+#define TS_PTRMSGTYPE_CACHED           7
+#define TS_PTRMSGTYPE_POINTER          8
 
 /* System Pointer Update: systemPointerType (2.2.9.1.1.4.3) */
-#define RDP_NULL_POINTER               0
-#define RDP_DEFAULT_POINTER            0x7F00
+/* These may also be defined by freerdp */
+#ifndef SYSPTR_NULL
+#define SYSPTR_NULL                    0
+#define SYSPTR_DEFAULT                 0x7F00
+#endif
 
 /* Server Fast-Path Update PDU: action (2.2.9.1.2) */
 #define FASTPATH_OUTPUT_ACTION_FASTPATH     0x0
