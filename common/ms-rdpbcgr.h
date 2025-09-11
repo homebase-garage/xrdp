@@ -449,21 +449,21 @@
     )
 
 /* Share Data Header: pduType2 (2.2.8.1.1.1.2) */
-/* TODO: to be renamed */
-#define RDP_DATA_PDU_UPDATE            2   /* PDUTYPE2_UPDATE */
-#define RDP_DATA_PDU_CONTROL           20
-#define RDP_DATA_PDU_POINTER           27
-#define RDP_DATA_PDU_INPUT             28
-#define RDP_DATA_PDU_SYNCHRONISE       31
+#define PDUTYPE2_UPDATE                2
+#define PDUTYPE2_CONTROL               20
+#define PDUTYPE2_POINTER               27
+#define PDUTYPE2_INPUT                 28
+#define PDUTYPE2_SYNCHRONISE           31
 #define PDUTYPE2_REFRESH_RECT          33
-#define RDP_DATA_PDU_PLAY_SOUND        34
+#define PDUTYPE2_PLAY_SOUND            34
 #define PDUTYPE2_SUPPRESS_OUTPUT       35
 #define PDUTYPE2_SHUTDOWN_REQUEST      36
 #define PDUTYPE2_SHUTDOWN_DENIED       37
-#define RDP_DATA_PDU_LOGON             38
-#define RDP_DATA_PDU_FONT2             39
-#define RDP_DATA_PDU_DISCONNECT        47
+#define PDUTYPE2_SAVE_SESSION_INFO     38
+#define PDUTYPE2_FONTLIST              39
+#define PDUTYPE2_SET_ERROR_INFO_PDU    47
 #define PDUTYPE2_MONITOR_LAYOUT_PDU    55
+#define PDUTYPE2_FRAME_ACKNOWLEDGE     56 /* From [MS-RDPRFX] */
 
 /* TS_SECURITY_HEADER: flags (2.2.8.1.1.2.1) */
 #define SEC_EXCHANGE_PKT               0x0001
@@ -527,31 +527,32 @@
 #define FASTPATH_INPUT_KBDFLAGS_EXTENDED1   0x04
 
 /* Slow-Path Graphics Update: updateType (2.2.9.1.1.3.1) */
-/* TODO: to be renamed */
-#define RDP_UPDATE_ORDERS              0
-#define RDP_UPDATE_BITMAP              1
-#define RDP_UPDATE_PALETTE             2
-#define RDP_UPDATE_SYNCHRONIZE         3
+#define UPDATETYPE_ORDERS              0
+#define UPDATETYPE_BITMAP              1
+#define UPDATETYPE_PALETTE             2
+#define UPDATETYPE_SYNCHRONIZE         3
 
 #define GRAPHICS_UPDATE_TYPE_TO_STR(type) \
-    ((type) == RDP_UPDATE_ORDERS ? "RDP_UPDATE_ORDERS" : \
-     (type) == RDP_UPDATE_BITMAP ? "RDP_UPDATE_BITMAP" : \
-     (type) == RDP_UPDATE_PALETTE ? "RDP_UPDATE_PALETTE" : \
-     (type) == RDP_UPDATE_SYNCHRONIZE ? "RDP_UPDATE_SYNCHRONIZE" : \
+    ((type) == UPDATETYPE_ORDERS ? "UPDATETYPE_ORDERS" : \
+     (type) == UPDATETYPE_BITMAP ? "UPDATETYPE_BITMAP" : \
+     (type) == UPDATETYPE_PALETTE ? "UPDATETYPE_PALETTE" : \
+     (type) == UPDATETYPE_SYNCHRONIZE ? "UPDATETYPE_SYNCHRONIZE" : \
      "unknown" \
     )
 
 /* Server Pointer Update PDU: messageType (2.2.9.1.1.4) */
-/* TODO: to be renamed */
-#define RDP_POINTER_SYSTEM             1 /* TS_PTRMSGTYPE_SYSTEM */
-#define RDP_POINTER_MOVE               3
-#define RDP_POINTER_COLOR              6
-#define RDP_POINTER_CACHED             7
-#define RDP_POINTER_POINTER            8
+#define TS_PTRMSGTYPE_SYSTEM           1
+#define TS_PTRMSGTYPE_POSITION         3
+#define TS_PTRMSGTYPE_COLOR            6
+#define TS_PTRMSGTYPE_CACHED           7
+#define TS_PTRMSGTYPE_POINTER          8
 
 /* System Pointer Update: systemPointerType (2.2.9.1.1.4.3) */
-#define RDP_NULL_POINTER               0
-#define RDP_DEFAULT_POINTER            0x7F00
+/* These may also be defined by freerdp */
+#ifndef SYSPTR_NULL
+#define SYSPTR_NULL                    0
+#define SYSPTR_DEFAULT                 0x7F00
+#endif
 
 /* Server Fast-Path Update PDU: action (2.2.9.1.2) */
 #define FASTPATH_OUTPUT_ACTION_FASTPATH     0x0

@@ -1569,7 +1569,7 @@ process_display_control_monitor_layout_data(struct xrdp_wm *wm)
     {
         case WMRZ_ENCODER_DELETE:
             // Stop any output from the module
-            rdp = (struct xrdp_rdp *) (wm->session->rdp);
+            rdp = wm->session->rdp;
             xrdp_rdp_suppress_output(rdp,
                                      1, XSO_REASON_DYNAMIC_RESIZE,
                                      0, 0, 0, 0);
@@ -1605,7 +1605,7 @@ process_display_control_monitor_layout_data(struct xrdp_wm *wm)
             break;
         // Also processed in xrdp_egfx_close_response
         case WMRZ_EGFX_CONN_CLOSING:
-            rdp = (struct xrdp_rdp *) (wm->session->rdp);
+            rdp = wm->session->rdp;
             sec = rdp->sec_layer;
             chan = sec->chan_layer;
 
@@ -1749,7 +1749,7 @@ process_display_control_monitor_layout_data(struct xrdp_wm *wm)
             // Restart module output after invalidating
             // the screen. This causes an automatic redraw.
             xrdp_bitmap_invalidate(wm->screen, 0);
-            rdp = (struct xrdp_rdp *) (wm->session->rdp);
+            rdp = wm->session->rdp;
             xrdp_rdp_suppress_output(rdp,
                                      0, XSO_REASON_DYNAMIC_RESIZE,
                                      0, 0, desc_width, desc_height);

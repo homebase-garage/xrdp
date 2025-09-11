@@ -124,7 +124,7 @@ xrdp_orders_init(struct xrdp_orders *self)
                 LOG(LOG_LEVEL_ERROR, "xrdp_orders_init: xrdp_rdp_init_data failed");
                 return 1;
             }
-            out_uint16_le(self->out_s, RDP_UPDATE_ORDERS); /* updateType */
+            out_uint16_le(self->out_s, UPDATETYPE_ORDERS); /* updateType */
             out_uint8s(self->out_s, 2); /* pad */
             self->order_count_ptr = self->out_s->p;
             out_uint8s(self->out_s, 2); /* number of orders, set later */
@@ -132,7 +132,7 @@ xrdp_orders_init(struct xrdp_orders *self)
             LOG_DEVEL(LOG_LEVEL_TRACE, "Adding header [MS-RDPEGDI] TS_UPDATE_ORDERS_PDU_DATA "
                       "updateType %d (UPDATETYPE_ORDERS), pad2OctetsA <ignored>, "
                       "numberOrders <to be set later>, pad2OctetsB <ignored>",
-                      RDP_UPDATE_ORDERS);
+                      UPDATETYPE_ORDERS);
         }
     }
     return 0;
@@ -169,7 +169,7 @@ xrdp_orders_send(struct xrdp_orders *self)
             else
             {
                 if (xrdp_rdp_send_data(self->rdp_layer, self->out_s,
-                                       RDP_DATA_PDU_UPDATE) != 0)
+                                       PDUTYPE2_UPDATE) != 0)
                 {
                     LOG(LOG_LEVEL_ERROR,
                         "xrdp_orders_send: xrdp_rdp_send_data failed");
@@ -207,7 +207,7 @@ xrdp_orders_force_send(struct xrdp_orders *self)
         else
         {
             if (xrdp_rdp_send_data(self->rdp_layer, self->out_s,
-                                   RDP_DATA_PDU_UPDATE) != 0)
+                                   PDUTYPE2_UPDATE) != 0)
             {
                 return 1;
             }

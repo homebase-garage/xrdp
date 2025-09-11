@@ -890,7 +890,7 @@ xrdp_rdp_send_data_update_sync(struct xrdp_rdp *self)
             free_stream(s);
             return 1;
         }
-        out_uint16_le(s, RDP_UPDATE_SYNCHRONIZE); /* updateType */
+        out_uint16_le(s, UPDATETYPE_SYNCHRONIZE); /* updateType */
         out_uint16_le(s, 0); /* pad */
 
     }
@@ -912,9 +912,9 @@ xrdp_rdp_send_data_update_sync(struct xrdp_rdp *self)
     {
         LOG_DEVEL(LOG_LEVEL_TRACE, "Sending [MS-RDPBCGR] TS_UPDATE_SYNC "
                   "updateType %s (%d)",
-                  GRAPHICS_UPDATE_TYPE_TO_STR(RDP_UPDATE_SYNCHRONIZE),
-                  RDP_UPDATE_SYNCHRONIZE);
-        if (xrdp_rdp_send_data(self, s, RDP_DATA_PDU_UPDATE) != 0)
+                  GRAPHICS_UPDATE_TYPE_TO_STR(UPDATETYPE_SYNCHRONIZE),
+                  UPDATETYPE_SYNCHRONIZE);
+        if (xrdp_rdp_send_data(self, s, PDUTYPE2_UPDATE) != 0)
         {
             LOG(LOG_LEVEL_ERROR, "Sending [MS-RDPBCGR] TS_UPDATE_SYNC failed");
             free_stream(s);
@@ -1095,7 +1095,7 @@ xrdp_rdp_send_synchronise(struct xrdp_rdp *self)
     LOG_DEVEL(LOG_LEVEL_TRACE, "Sending [MS-RDPBCGR] TS_SYNCHRONIZE_PDU "
               "messageType 1, targetUser 1002");
 
-    if (xrdp_rdp_send_data(self, s, RDP_DATA_PDU_SYNCHRONISE) != 0)
+    if (xrdp_rdp_send_data(self, s, PDUTYPE2_SYNCHRONISE) != 0)
     {
         LOG(LOG_LEVEL_ERROR, "Sending [MS-RDPBCGR] TS_SYNCHRONIZE_PDU failed");
         free_stream(s);
@@ -1131,7 +1131,7 @@ xrdp_rdp_send_control(struct xrdp_rdp *self, int action,
     LOG_DEVEL(LOG_LEVEL_TRACE, "Sending [MS-RDPBCGR] TS_CONTROL_PDU "
               "action %d, grantId 0, controlId 1002", action);
 
-    if (xrdp_rdp_send_data(self, s, RDP_DATA_PDU_CONTROL) != 0)
+    if (xrdp_rdp_send_data(self, s, PDUTYPE2_CONTROL) != 0)
     {
         LOG(LOG_LEVEL_ERROR, "Sending [MS-RDPBCGR] TS_CONTROL_PDU failed");
         free_stream(s);
@@ -1388,7 +1388,7 @@ xrdp_rdp_send_set_error(struct xrdp_rdp *self, int reason)
     LOG_DEVEL(LOG_LEVEL_TRACE, "Sending [MS-RDPBCGR] TS_SET_ERROR_INFO_PDU "
               "errorInfo 0x%8.8x", reason);
 
-    if (xrdp_rdp_send_data(self, s, RDP_DATA_PDU_DISCONNECT) != 0)
+    if (xrdp_rdp_send_data(self, s, PDUTYPE2_SET_ERROR_INFO_PDU) != 0)
     {
         LOG(LOG_LEVEL_ERROR,
             "Sending [MS-RDPBCGR] TS_SET_ERROR_INFO_PDU failed");
@@ -1549,35 +1549,35 @@ xrdp_rdp_process_data(struct xrdp_rdp *self, struct stream *s)
 
     switch (pduType2)
     {
-        case RDP_DATA_PDU_POINTER: /* 27(0x1b) */
+        case PDUTYPE2_POINTER:
             xrdp_rdp_process_data_pointer(self, s);
             break;
-        case RDP_DATA_PDU_INPUT: /* 28(0x1c) */
+        case PDUTYPE2_INPUT:
             xrdp_rdp_process_data_input(self, s);
             break;
-        case RDP_DATA_PDU_CONTROL: /* 20(0x14) */
+        case PDUTYPE2_CONTROL:
             xrdp_rdp_process_data_control(self, s);
             break;
-        case RDP_DATA_PDU_SYNCHRONISE: /* 31(0x1f) */
+        case PDUTYPE2_SYNCHRONISE:
             xrdp_rdp_process_data_sync(self);
             break;
         case PDUTYPE2_REFRESH_RECT:
             xrdp_rdp_process_screen_update(self, s);
             break;
-        case PDUTYPE2_SUPPRESS_OUTPUT: /* 35(0x23) */
+        case PDUTYPE2_SUPPRESS_OUTPUT:
             xrdp_rdp_process_suppress(self, s);
             break;
-        case PDUTYPE2_SHUTDOWN_REQUEST: /* 36(0x24) ?? disconnect query? */
+        case PDUTYPE2_SHUTDOWN_REQUEST:
             /* when this message comes, send a 37 back so the client */
             /* is sure the connection is alive and it can ask if user */
             /* really wants to disconnect */
             LOG_DEVEL(LOG_LEVEL_TRACE, "Received [MS-RDPBCGR] TS_SHUTDOWN_REQ_PDU");
             xrdp_rdp_send_disconnect_query_response(self); /* send a 37 back */
             break;
-        case RDP_DATA_PDU_FONT2: /* 39(0x27) */
+        case PDUTYPE2_FONTLIST:
             xrdp_rdp_process_data_font(self, s);
             break;
-        case 56: /* PDUTYPE2_FRAME_ACKNOWLEDGE 0x38 */
+        case PDUTYPE2_FRAME_ACKNOWLEDGE:
             xrdp_rdp_process_frame_ack(self, s);
             break;
         default:
@@ -1680,7 +1680,7 @@ xrdp_rdp_send_session_info(struct xrdp_rdp *self, const char *data,
               "infoType 0x%8.8x, infoData <omitted from log>",
               *((unsigned int *) data));
 
-    if (xrdp_rdp_send_data(self, s, RDP_DATA_PDU_LOGON) != 0)
+    if (xrdp_rdp_send_data(self, s, PDUTYPE2_SAVE_SESSION_INFO) != 0)
     {
         LOG(LOG_LEVEL_ERROR, "Sending [MS-RDPBCGR] TS_SAVE_SESSION_INFO_PDU_DATA failed");
         free_stream(s);
