@@ -1468,6 +1468,8 @@ add_resize_request_to_queue(struct xrdp_mm *self,
         }
         else
         {
+            // This call only has an effect if the wait_obj is not
+            // NULL_WAIT_OBJ
             g_set_wait_obj(self->resize_ready);
         }
     }
@@ -1559,9 +1561,10 @@ dynamic_monitor_data(struct xrdp_process *id, int chan_id,
         return error;
     }
     LOG(LOG_LEVEL_DEBUG, "dynamic_monitor_data:"
-        " received width %d, received height %d.",
+        " received width %d, received height %d, queue %s",
         description.session_width,
-        description.session_height);
+        description.session_height,
+        (wm->mm->resize_ready == NULL_WAIT_OBJ) ? "inactive" : "active");
     return 0;
 }
 
@@ -1950,8 +1953,6 @@ dynamic_monitor_initialize(struct xrdp_mm *self)
     struct xrdp_drdynvc_procs d_procs;
     int flags;
     int error;
-    char buf[1024];
-    int pid;
 
     LOG_DEVEL(LOG_LEVEL_TRACE, "dynamic_monitor_initialize:");
 
@@ -1975,11 +1976,8 @@ dynamic_monitor_initialize(struct xrdp_mm *self)
     // Initialize xrdp_mm specific variables.
     self->resize_queue = list_create();
     self->resize_queue->auto_free = 1;
-    pid = g_getpid();
-    /* setup wait objects for signaling */
-    g_snprintf(buf, sizeof(buf), "xrdp_%8.8x_resize_ready", pid);
-    self->resize_ready = g_create_wait_obj(buf);
     self->resize_data = NULL;
+    self->resize_ready = NULL_WAIT_OBJ;
 
     return error;
 }
@@ -3270,6 +3268,41 @@ xrdp_mm_connect(struct xrdp_mm *self)
 }
 
 /*****************************************************************************/
+/**
+ * Start resize queue processing
+ *
+ * The xrdp login screen does not currently support client-side resizes. We
+ * currently address this by not processing the resize queue until we are
+ * able to do so.
+ *
+ * We implement this by not creating the resize_ready wait object until
+ * we are able to process the queue. Calls made to an empty wait object
+ * are simply ignored.
+ *
+ * @param self MM module
+ */
+static void
+start_processing_resize_queue(struct xrdp_mm *self)
+{
+    if (self->resize_ready == NULL_WAIT_OBJ)
+    {
+        char buf[32];
+        int outstanding =
+            (self->resize_queue != NULL) ? self->resize_queue->count : 0;
+        int pid = g_getpid();
+        g_snprintf(buf, sizeof(buf), "xrdp_%8.8x_resize_ready", pid);
+        self->resize_ready = g_create_wait_obj(buf);
+        LOG(LOG_LEVEL_INFO,
+            "xrdp can now process resize requests (%d outstanding)",
+            outstanding);
+        if (outstanding > 0)
+        {
+            g_set_wait_obj(self->resize_ready);
+        }
+    }
+}
+
+/*****************************************************************************/
 static void
 xrdp_mm_connect_sm(struct xrdp_mm *self)
 {
@@ -3445,6 +3478,12 @@ xrdp_mm_connect_sm(struct xrdp_mm *self)
                                 "Connecting to display server");
                 /* This is synchronous - no reply message expected */
                 status = xrdp_mm_display_server_connect(self);
+                if (status == 0)
+                {
+                    // This is as good a place as any to start processing
+                    // the resize_queue
+                    start_processing_resize_queue(self);
+                }
             }
             break;
 
@@ -3542,7 +3581,7 @@ xrdp_mm_get_wait_objs(struct xrdp_mm *self,
         read_objs[(*rcount)++] = self->encoder->xrdp_encoder_event_processed;
     }
 
-    if (self->resize_queue != 0)
+    if (self->resize_queue != 0 && self->resize_ready != NULL_WAIT_OBJ)
     {
         read_objs[(*rcount)++] = self->resize_ready;
     }
