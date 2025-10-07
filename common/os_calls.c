@@ -1855,7 +1855,7 @@ g_delete_wait_obj_from_socket(tintptr wait_obj)
 {
 #ifdef _WIN32
 
-    if (wait_obj == 0)
+    if (wait_obj == NULL_WAIT_OBJ)
     {
         return;
     }
@@ -1879,7 +1879,7 @@ g_set_wait_obj(tintptr obj)
     int to_write;
     char buf[4] = "sig";
 
-    if (obj == 0)
+    if (obj == NULL_WAIT_OBJ)
     {
         return 0;
     }
@@ -1928,7 +1928,7 @@ int
 g_reset_wait_obj(tintptr obj)
 {
 #ifdef _WIN32
-    if (obj == 0)
+    if (obj == NULL_WAIT_OBJ)
     {
         return 0;
     }
@@ -1939,7 +1939,7 @@ g_reset_wait_obj(tintptr obj)
     int error;
     int fd;
 
-    if (obj == 0)
+    if (obj == NULL_WAIT_OBJ)
     {
         return 0;
     }
@@ -1975,7 +1975,7 @@ int
 g_is_wait_obj_set(tintptr obj)
 {
 #ifdef _WIN32
-    if (obj == 0)
+    if (obj == NULL_WAIT_OBJ)
     {
         return 0;
     }
@@ -1985,7 +1985,7 @@ g_is_wait_obj_set(tintptr obj)
     }
     return 0;
 #else
-    if (obj == 0)
+    if (obj == NULL_WAIT_OBJ)
     {
         return 0;
     }
@@ -1999,7 +1999,7 @@ int
 g_delete_wait_obj(tintptr obj)
 {
 #ifdef _WIN32
-    if (obj == 0)
+    if (obj == NULL_WAIT_OBJ)
     {
         return 0;
     }
