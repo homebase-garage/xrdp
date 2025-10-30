@@ -98,11 +98,11 @@ AC_ARG_ENABLE(ipv6only, AS_HELP_STRING([--enable-ipv6only],
 AC_ARG_ENABLE(kerberos, AS_HELP_STRING([--enable-kerberos],
               [Build kerberos support (prefer --enable-pam if available) (default: no)]),
               [], [enable_kerberos=no])
+AM_CONDITIONAL(SESMAN_KERBEROS, [test x$enable_kerberos = xyes])
 AC_ARG_ENABLE(bsd, AS_HELP_STRING([--enable-bsd],
               [Build BSD auth support (default: no)]),
-              [bsd=true], [bsd=false])
-AM_CONDITIONAL(SESMAN_BSD, [test x$bsd = xtrue])
-AM_CONDITIONAL(SESMAN_KERBEROS, [test x$enable_kerberos = xyes])
+              [], [enable_bsd=no])
+AM_CONDITIONAL(SESMAN_BSD, [test x$enable_bsd = xyes])
 AC_ARG_ENABLE(pamuserpass, AS_HELP_STRING([--enable-pamuserpass],
               [Build PAM userpass support (default: no)]),
               [], [enable_pamuserpass=no])
@@ -369,7 +369,7 @@ then
   AUTHMOD_OBJ=verify_user_pam.lo
   AUTHMOD_LIB=-lpam
 fi
-if test x$bsd = xtrue
+if test x$enable_bsd = xyes
 then
   auth_cnt=`expr $auth_cnt + 1`
   auth_mech="BSD"
@@ -402,11 +402,8 @@ AC_SUBST([AUTHMOD_LIB])
 # checking if pam should be autodetected.
 if test "x$enable_pam" = "xyes"
 then
-  if test -z "$enable_bsd"
-  then
-    AC_CHECK_HEADER([security/pam_appl.h], [],
-      [AC_MSG_ERROR([please install libpam0g-dev or pam-devel])])
-  fi
+  AC_CHECK_HEADER([security/pam_appl.h], [],
+    [AC_MSG_ERROR([please install libpam0g-dev or pam-devel])])
   if test "x$enable_pam_config" = "x"; then
     PAM_RULES="auto"
   else
