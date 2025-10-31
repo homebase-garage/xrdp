@@ -104,7 +104,23 @@ if [ -z "$CPPCHECK_FLAGS" ]; then
         check_level="Default (option not supported)"
     fi
 
-    CPPCHECK_FLAGS="$CPPCHECK_FLAGS -I . -I common"
+    CPPCHECK_FLAGS="$CPPCHECK_FLAGS \
+                    -I . \
+                    -I common \
+                    -I libipm \
+                    -I libpainter/include \
+                    -I librfxcodec/include \
+                    -I librfxcodec/src \
+                    -I librfxcodec/src/neon \
+                    -I librfxcodec/src/sse2 \
+                    -I libxrdp \
+                    -I sesman/libsesman \
+                    -I sesman/sesexec \
+                    -I third_party \
+                    -I third_party/tomlc99 \
+                    -I xrdp \
+                    -I xrdpapi \
+                    -I xrdpvr"
 fi
 CPPCHECK_FLAGS="$CPPCHECK_FLAGS -D__cppcheck__"
 
