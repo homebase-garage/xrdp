@@ -22,7 +22,7 @@
 #endif
 
 #include "libxrdp.h"
-#include "freerdp/codec/rfx.h"
+#include <freerdp/codec/rfx.h>
 
 /*****************************************************************************/
 struct xrdp_surface *
