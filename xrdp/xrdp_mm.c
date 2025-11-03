@@ -998,9 +998,9 @@ xrdp_mm_egfx_invalidate_wm_screen(struct xrdp_mm *self)
 
 /******************************************************************************/
 static int
-dynamic_monitor_open_response(intptr_t id, int chan_id, int creation_status)
+dynamic_monitor_open_response(struct xrdp_process *id, int chan_id,
+                              int creation_status)
 {
-    struct xrdp_process *pro;
     struct xrdp_wm *wm;
     struct stream *s;
     int bytes;
@@ -1012,8 +1012,7 @@ dynamic_monitor_open_response(intptr_t id, int chan_id, int creation_status)
         LOG(LOG_LEVEL_ERROR, "dynamic_monitor_open_response: error");
         return 1;
     }
-    pro = (struct xrdp_process *) id;
-    wm = pro->wm;
+    wm = id->wm;
     make_stream(s);
     init_stream(s, 1024);
     out_uint32_le(s, 5); /* DISPLAYCONTROL_PDU_TYPE_CAPS */
@@ -1030,7 +1029,7 @@ dynamic_monitor_open_response(intptr_t id, int chan_id, int creation_status)
 
 /******************************************************************************/
 static int
-dynamic_monitor_close_response(intptr_t id, int chan_id)
+dynamic_monitor_close_response(struct xrdp_process *id, int chan_id)
 {
     LOG_DEVEL(LOG_LEVEL_TRACE, "dynamic_monitor_close_response:");
     return 0;
@@ -1038,8 +1037,8 @@ dynamic_monitor_close_response(intptr_t id, int chan_id)
 
 /******************************************************************************/
 static int
-dynamic_monitor_data_first(intptr_t id, int chan_id, char *data, int bytes,
-                           int total_bytes)
+dynamic_monitor_data_first(struct xrdp_process *id, int chan_id,
+                           char *data, int bytes, int total_bytes)
 {
     LOG_DEVEL(LOG_LEVEL_TRACE, "dynamic_monitor_data_first:");
     return 0;
@@ -1438,21 +1437,20 @@ sync_dynamic_monitor_data(struct xrdp_wm *wm,
 
 /******************************************************************************/
 static int
-dynamic_monitor_data(intptr_t id, int chan_id, char *data, int bytes)
+dynamic_monitor_data(struct xrdp_process *id, int chan_id,
+                     char *data, int bytes)
 {
     int error = 0;
     struct stream ls;
     struct stream *s;
     int msg_type;
     int msg_length;
-    struct xrdp_process *pro;
     struct xrdp_wm *wm;
     int monitor_layout_size;
     struct display_size_description *display_size_data;
 
     LOG_DEVEL(LOG_LEVEL_TRACE, "dynamic_monitor_data:");
-    pro = (struct xrdp_process *) id;
-    wm = pro->wm;
+    wm = id->wm;
 
     if (OUTPUT_SUPPRESSED_FOR_REASON(wm->client_info,
                                      XSO_REASON_CLIENT_REQUEST))
@@ -2029,19 +2027,18 @@ xrdp_mm_logwnd_fatal(struct xrdp_mm *self, int errinfo)
 /*****************************************************************************/
 /* open response from client going to channel server */
 static int
-xrdp_mm_drdynvc_open_response(intptr_t id, int chan_id, int creation_status)
+xrdp_mm_drdynvc_open_response(struct xrdp_process *id, int chan_id,
+                              int creation_status)
 {
     struct trans *trans;
     struct stream *s;
     struct xrdp_wm *wm;
-    struct xrdp_process *pro;
     int chansrv_chan_id;
 
     LOG_DEVEL(LOG_LEVEL_DEBUG, "xrdp_mm_drdynvc_open_response: "
               " chan_id %d creation_status %d",
               chan_id, creation_status);
-    pro = (struct xrdp_process *) id;
-    wm = pro->wm;
+    wm = id->wm;
     trans = wm->mm->chan_trans;
     s = trans_get_out_s(trans, 8192);
     if (s == NULL)
@@ -2062,16 +2059,14 @@ xrdp_mm_drdynvc_open_response(intptr_t id, int chan_id, int creation_status)
 /*****************************************************************************/
 /* close response from client going to channel server */
 static int
-xrdp_mm_drdynvc_close_response(intptr_t id, int chan_id)
+xrdp_mm_drdynvc_close_response(struct xrdp_process *id, int chan_id)
 {
     struct trans *trans;
     struct stream *s;
     struct xrdp_wm *wm;
-    struct xrdp_process *pro;
     int chansrv_chan_id;
 
-    pro = (struct xrdp_process *) id;
-    wm = pro->wm;
+    wm = id->wm;
     trans = wm->mm->chan_trans;
     s = trans_get_out_s(trans, 8192);
     if (s == NULL)
@@ -2091,17 +2086,15 @@ xrdp_mm_drdynvc_close_response(intptr_t id, int chan_id)
 /*****************************************************************************/
 /* part data from client going to channel server */
 static int
-xrdp_mm_drdynvc_data_first(intptr_t id, int chan_id, char *data,
+xrdp_mm_drdynvc_data_first(struct xrdp_process *id, int chan_id, char *data,
                            int bytes, int total_bytes)
 {
     struct trans *trans;
     struct stream *s;
     struct xrdp_wm *wm;
-    struct xrdp_process *pro;
     int chansrv_chan_id;
 
-    pro = (struct xrdp_process *) id;
-    wm = pro->wm;
+    wm = id->wm;
     trans = wm->mm->chan_trans;
     s = trans_get_out_s(trans, 8192);
     if (s == NULL)
@@ -2124,16 +2117,15 @@ xrdp_mm_drdynvc_data_first(intptr_t id, int chan_id, char *data,
 /*****************************************************************************/
 /* data from client going to channel server */
 static int
-xrdp_mm_drdynvc_data(intptr_t id, int chan_id, char *data, int bytes)
+xrdp_mm_drdynvc_data(struct xrdp_process *id, int chan_id,
+                     char *data, int bytes)
 {
     struct trans *trans;
     struct stream *s;
     struct xrdp_wm *wm;
-    struct xrdp_process *pro;
     int chansrv_chan_id;
 
-    pro = (struct xrdp_process *) id;
-    wm = pro->wm;
+    wm = id->wm;
     trans = wm->mm->chan_trans;
     s = trans_get_out_s(trans, 8192);
     if (s == NULL)

@@ -175,7 +175,7 @@ int
 xrdp_wm_pointer(struct xrdp_wm *self, char *data, char *mask, int x, int y,
                 int bpp, int width, int height);
 int
-callback(intptr_t id, int msg, intptr_t param1, intptr_t param2,
+callback(struct xrdp_process *id, int msg, intptr_t param1, intptr_t param2,
          intptr_t param3, intptr_t param4);
 int
 xrdp_wm_delete_all_children(struct xrdp_wm *self);

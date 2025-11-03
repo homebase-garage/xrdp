@@ -2095,14 +2095,14 @@ xrdp_wm_process_channel_data(struct xrdp_wm *self,
 /******************************************************************************/
 /* this is the callbacks coming from libxrdp.so */
 int
-callback(intptr_t id, int msg, intptr_t param1, intptr_t param2,
+callback(struct xrdp_process *id, int msg, intptr_t param1, intptr_t param2,
          intptr_t param3, intptr_t param4)
 {
     int rv;
     struct xrdp_wm *wm;
     struct xrdp_rect rect;
 
-    if (id == 0) /* "id" should be "struct xrdp_process*" as long */
+    if (id == NULL)
     {
         return 0;
     }

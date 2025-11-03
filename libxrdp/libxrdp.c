@@ -33,7 +33,7 @@
 
 /******************************************************************************/
 struct xrdp_session *EXPORT_CC
-libxrdp_init(tbus id, struct trans *trans, const char *xrdp_ini)
+libxrdp_init(struct xrdp_process *id, struct trans *trans, const char *xrdp_ini)
 {
     struct xrdp_session *session;
 
