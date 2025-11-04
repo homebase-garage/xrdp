@@ -135,16 +135,20 @@ struct xrdp_sec
     int is_security_header_present; /* boolean */
 };
 
+struct xrdp_process;
+
 struct xrdp_drdynvc
 {
     int chan_id;
     int status; /* see XRDP_DRDYNVC_STATUS_* */
     int flags;
     int pad0;
-    int (*open_response)(intptr_t id, int chan_id, int creation_status);
-    int (*close_response)(intptr_t id, int chan_id);
-    int (*data_first)(intptr_t id, int chan_id, char *data, int bytes, int total_bytes);
-    int (*data)(intptr_t id, int chan_id, char *data, int bytes);
+    int (*open_response)(struct xrdp_process *id, int chan_id,
+                         int creation_status);
+    int (*close_response)(struct xrdp_process *id, int chan_id);
+    int (*data_first)(struct xrdp_process *id, int chan_id, char *data,
+                      int bytes, int total_bytes);
+    int (*data)(struct xrdp_process *id, int chan_id, char *data, int bytes);
 };
 
 /* channel */

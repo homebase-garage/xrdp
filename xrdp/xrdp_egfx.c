@@ -924,7 +924,8 @@ xrdp_egfx_process(struct xrdp_egfx *egfx, struct stream *s)
 /******************************************************************************/
 /* from client */
 static int
-xrdp_egfx_open_response(intptr_t id, int chan_id, int creation_status)
+xrdp_egfx_open_response(struct xrdp_process *id, int chan_id,
+                        int creation_status)
 {
     LOG(LOG_LEVEL_TRACE, "xrdp_egfx_open_response:");
     return 0;
@@ -933,15 +934,13 @@ xrdp_egfx_open_response(intptr_t id, int chan_id, int creation_status)
 /******************************************************************************/
 /* from client */
 static int
-xrdp_egfx_close_response(intptr_t id, int chan_id)
+xrdp_egfx_close_response(struct xrdp_process *id, int chan_id)
 {
-    struct xrdp_process *process;
     struct xrdp_mm *mm;
 
     LOG(LOG_LEVEL_TRACE, "xrdp_egfx_close_response:");
 
-    process = (struct xrdp_process *) id;
-    mm = process->wm->mm;
+    mm = id->wm->mm;
 
     if (mm->resize_queue == 0 || mm->resize_queue->count <= 0)
     {
@@ -959,16 +958,14 @@ xrdp_egfx_close_response(intptr_t id, int chan_id)
 /******************************************************************************/
 /* from client */
 static int
-xrdp_egfx_data_first(intptr_t id, int chan_id, char *data, int bytes,
-                     int total_bytes)
+xrdp_egfx_data_first(struct xrdp_process *id, int chan_id,
+                     char *data, int bytes, int total_bytes)
 {
-    struct xrdp_process *process;
     struct xrdp_egfx *egfx;
 
     LOG(LOG_LEVEL_TRACE, "xrdp_egfx_data_first: bytes %d"
         " total_bytes %d", bytes, total_bytes);
-    process = (struct xrdp_process *) id;
-    egfx = process->wm->mm->egfx;
+    egfx = id->wm->mm->egfx;
     if (egfx->s != NULL)
     {
         LOG(LOG_LEVEL_DEBUG, "xrdp_egfx_data_first: Error!"
@@ -983,24 +980,22 @@ xrdp_egfx_data_first(intptr_t id, int chan_id, char *data, int bytes,
 /******************************************************************************/
 /* from client */
 static int
-xrdp_egfx_data(intptr_t id, int chan_id, char *data, int bytes)
+xrdp_egfx_data(struct xrdp_process *id, int chan_id, char *data, int bytes)
 {
     int error;
     struct stream ls;
-    struct xrdp_process *process;
     struct xrdp_wm *wm;
     struct xrdp_mm *mm;
     struct xrdp_egfx *egfx;
 
     LOG(LOG_LEVEL_TRACE, "xrdp_egfx_data:");
 
-    process = (struct xrdp_process *) id;
-    if (process == NULL)
+    if (id == NULL)
     {
         return 0;
     }
 
-    wm = process->wm;
+    wm = id->wm;
     if (wm == NULL)
     {
         return 0;
