@@ -141,7 +141,7 @@ scp_list_set_peername(struct scp_list_item *sli, const char *name);
 
 /**
  * @brief Get the wait objs for the SCP list module
- * @param @robjs Objects array to update
+ * @param robjs Objects array to update
  * @param robjs_count Elements in robjs (by reference)
  * @return 0 for success
  */

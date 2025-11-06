@@ -59,7 +59,7 @@ struct session_data
 {
     pid_t x_server; ///< PID of X server
     pid_t win_mgr; ///< PID of window manager
-    pid_t chansrv; //< PID of chansrv
+    pid_t chansrv; ///< PID of chansrv
     time_t start_time;
     unsigned int connect_count;
     struct session_parameters params;
@@ -154,10 +154,8 @@ session_data_free(struct session_data *session_data)
 /******************************************************************************/
 /**
  * Creates a string consisting of all parameters that is hosted in the param list
- * @param self
- * @param outstr, allocate this buffer before you use this function
+ * @param outstr allocate this buffer before you use this function
  * @param len the allocated len for outstr
- * @return
  */
 static char *
 dumpItemsToString(struct list *self, char *outstr, int len)
@@ -410,9 +408,9 @@ prepare_xorg_xserver_params(const struct session_parameters *s,
 /**
  * Prepare a list of parameters for the Xvnc X server
  * @param s Session parameters
- * @params authfile XAUTHORITY file
- * @params passwd_file VNC password file, or NULL
- * @params port UDS port to connect to, or NULL
+ * @param authfile XAUTHORITY file
+ * @param passwd_file VNC password file, or NULL
+ * @param port UDS port to connect to, or NULL
  * @return parameters list
  *
  * One of passwd_file and port must be set

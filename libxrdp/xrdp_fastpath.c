@@ -154,7 +154,7 @@ xrdp_fastpath_send(struct xrdp_fastpath *self, struct stream *s)
 /*****************************************************************************/
 /**
  * Converts the fastpath keyboard event flags to slowpath event flags
- * @param Faspath flags
+ * @param fp_flags fastpath flags
  * @return slowpath flags
  *
  * See [MMS-RDPBCGR] 2.2.8.1.1.3.1.1.1 and 2.2.8.1.2.2.1

@@ -32,7 +32,7 @@ struct set_int;
 /**
  * @brief Gets a free display number
  *
- * @param Displays already allocated (or being allocated) by sesman
+ * @param alloc_displays Displays already allocated (or being allocated) by sesman
  * @return next available display, or -1 if none.
  */
 int

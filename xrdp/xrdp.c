@@ -148,9 +148,9 @@ xrdp_sig_no_op(int sig)
 /**
  *
  * @brief  Command line argument parser
- * @param  number of command line arguments
- * @param  pointer array of commandline arguments
- * @param  [out] Returned startup parameters
+ * @param argc number of command line arguments
+ * @param argv pointer array of commandline arguments
+ * @param startup_params [out] Returned startup parameters
  * @return 0 on success, n on nth argument is unknown
  *
  */
@@ -245,7 +245,7 @@ xrdp_process_params(int argc, char **argv,
  *
  * @brief  Read additional startup parameters from xrdp.ini
  *
- * @param  [in,out] startup parameters from the command line
+ * @param[in,out] startup_params parameters from the command line
  * @return 0 on success
  *
  */
