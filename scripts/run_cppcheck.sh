@@ -84,7 +84,10 @@ fi
 # Supply default flags passed to cppcheck if necessary
 if [ -z "$CPPCHECK_FLAGS" ]; then
     CPPCHECK_FLAGS="--quiet --force --std=c11 --std=c++11 --inline-suppr \
-                    --enable=warning --error-exitcode=1 -i third_party \
+                    --enable=warning,missingInclude --error-exitcode=1 \
+                    -i third_party \
+                    -i vrplayer \
+                    --suppress=missingIncludeSystem \
                     --suppress=uninitMemberVar:ulalaca/ulalaca.cpp \
                     --suppress=dangerousTypeCast:ulalaca/XrdpStream.template.cpp \
                     --suppress=shiftTooManyBits:libxrdp/xrdp_mppc_enc.c"
@@ -103,7 +106,23 @@ if [ -z "$CPPCHECK_FLAGS" ]; then
         check_level="Default (option not supported)"
     fi
 
-    CPPCHECK_FLAGS="$CPPCHECK_FLAGS -I . -I common"
+    CPPCHECK_FLAGS="$CPPCHECK_FLAGS \
+                    -I . \
+                    -I common \
+                    -I libipm \
+                    -I libpainter/include \
+                    -I librfxcodec/include \
+                    -I librfxcodec/src \
+                    -I librfxcodec/src/neon \
+                    -I librfxcodec/src/sse2 \
+                    -I libxrdp \
+                    -I sesman/libsesman \
+                    -I sesman/sesexec \
+                    -I third_party \
+                    -I third_party/tomlc99 \
+                    -I xrdp \
+                    -I xrdpapi \
+                    -I xrdpvr"
 fi
 CPPCHECK_FLAGS="$CPPCHECK_FLAGS -D__cppcheck__"
 

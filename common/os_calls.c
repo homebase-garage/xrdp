@@ -96,7 +96,7 @@ struct sockaddr_hvs
 #endif
 
 #include "os_calls.h"
-#include "limits.h"
+#include <limits.h>
 #include "string_calls.h"
 #include "log.h"
 #include "xrdp_constants.h"

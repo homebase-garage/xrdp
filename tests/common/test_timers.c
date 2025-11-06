@@ -3,7 +3,7 @@
 #include "config_ac.h"
 #endif
 
-#include "limits.h"
+#include <limits.h>
 #include "os_calls.h"
 #include "timers.h"
 
