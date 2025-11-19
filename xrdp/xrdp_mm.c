@@ -5324,7 +5324,10 @@ xrdp_mm_setup_mod2(struct xrdp_mm *self)
         }
         else if (self->code == XVNC_SESSION_CODE)
         {
-            g_snprintf(text, sizeof(text), "%d", 5900 + self->display);
+            if (self->use_sesman)
+            {
+                g_snprintf(text, sizeof(text), "%d", 5900 + self->display);
+            }
         }
         else if (self->code == XORG_SESSION_CODE ||
                  self->code == XVNC_UDS_SESSION_CODE)
