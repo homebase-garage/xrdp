@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
-#include <sys/signal.h>
 #include <unistd.h>
 #include <limits.h>
 
