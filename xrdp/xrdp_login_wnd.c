@@ -348,12 +348,12 @@ xrdp_wm_parse_domain_information(char *originalDomainInfo, int comboMax,
                 }
             }
             /* pos limit the String to only contain the IP */
-            g_strncpy(resultBuffer, &originalDomainInfo[1], pos);
+            strlcpy(resultBuffer, &originalDomainInfo[1], pos + 1);
         }
         else
         {
             LOG(LOG_LEVEL_DEBUG, "domain does not contain _");
-            g_strncpy(resultBuffer, &originalDomainInfo[1], resultSize - 1);
+            strlcpy(resultBuffer, &originalDomainInfo[1], resultSize);
         }
     }
     return ret;
