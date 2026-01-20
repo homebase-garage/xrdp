@@ -302,6 +302,12 @@ read_xrdp_ini_startup_params(struct xrdp_startup_params *startup_params)
                 }
             }
 
+            if (g_strcasecmp(name, "instance_name") == 0)
+            {
+                strlcpy(startup_params->instance_name, val,
+                        sizeof(startup_params->instance_name) - 1);
+            }
+
             else if (g_strcasecmp(name, "fork") == 0)
             {
                 if (fork_override == 0)

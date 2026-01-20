@@ -84,6 +84,7 @@ struct scp_list_item
     uid_t uid; ///< User
     char *username; ///< Username from UID (at time of logon)
     char start_ip_addr[MAX_PEER_ADDRSTRLEN];
+    char xrdp_instance_name[MAX_XRDP_INSTANCE_NAMELEN]; ///< Instance name associated with session
     int is_admin;
     int create_session_in_progress; ///< Already handling a create_session
     /// Display allocated for session. This is always valid (>= 0)
