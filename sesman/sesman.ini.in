@@ -124,6 +124,7 @@ IdleTimeLimit=0
 ;      B        Sessions are separated by bits-per-pixel
 ;      D        Sessions are separated by initial display size
 ;      I        Sessions are separated by IP address
+;      N        Sessions are separated by xrdp instance name
 ;
 ;   The options U and B are always active, and cannot be de-selected.
 ;

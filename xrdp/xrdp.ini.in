@@ -22,6 +22,11 @@ fork=true
 ;   port=vsock://<cid>:<port>
 port=3389
 
+; name of the xrdp instance. This can be set to an arbitrary string
+; used to distinguish sessions when the "N" policy is activated.
+; Defaults to an empty string.
+#instance_name=
+
 ; if used inside a Hyper-V VM through vmconnect and bound on vsock,
 ; turn this on to enable wider security protocol support.
 #vmconnect=true

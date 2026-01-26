@@ -71,6 +71,8 @@ struct session_item
     char client_ip[MAX_PEER_ADDRSTRLEN];
     char client_name[INFO_CLIENT_NAME_BYTES_UTF8];
     time_t last_connect_disconnect;
+    char xrdp_instance_name[MAX_XRDP_INSTANCE_NAMELEN];
+    /* allow a tag to be specified to distinguish sessions */
 };
 
 /**
@@ -140,7 +142,8 @@ session_list_get_bydata(uid_t uid,
                         unsigned short width,
                         unsigned short height,
                         unsigned char  bpp,
-                        const char *ip_addr);
+                        const char *ip_addr,
+                        const char *instance_name);
 
 /**
  * @brief retrieves session descriptions

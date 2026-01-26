@@ -761,6 +761,7 @@ struct xrdp_startup_params
     /* xrdp_ini is not malloc'd and has at least the same lifetime as main() */
     const char *xrdp_ini;
     char port[1024];
+    char instance_name[MAX_XRDP_INSTANCE_NAMELEN];
     int kill;
     int no_daemon;
     int help;

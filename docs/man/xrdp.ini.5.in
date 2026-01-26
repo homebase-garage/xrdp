@@ -29,6 +29,15 @@ Specify the port(s) that xrdp should listen on. More instructions and
 examples can be found within xrdp.ini itself.
 
 .TP
+\fBinstance_name\fR=\fI<arbitrary-string>\fR
+Specify an arbitrary name for the xrdp instance that can be used to
+identify sessions that this xrdp instance started, or which were
+spun up with the same name using \fBxrdp-sesrun\fR. When using the
+\fBN\fR policy in \fBsesman.ini\fR these sessions are kept distinct
+and can be reconnected to by connecting to the respective \fBxrdp\fR
+instance.
+
+.TP
 \fBvmconnect\fR=\fI[true|false]\fR
 (Hyper-V VMs only). Enables a wider support of security protocols when a
 virtual machine running xrdp is hosted on Hyper-V, and the user connects
