@@ -305,7 +305,8 @@ xrdp_wm_ok_clicked(struct xrdp_bitmap *wnd)
 */
 static int
 xrdp_wm_parse_domain_information(char *originalDomainInfo, int comboMax,
-                                 int decode, char *resultBuffer)
+                                 int decode,
+                                 char *resultBuffer, unsigned int resultSize)
 {
     int ret;
     int pos;
@@ -315,8 +316,7 @@ xrdp_wm_parse_domain_information(char *originalDomainInfo, int comboMax,
     /* If the first char in the domain name is '_' we use the domain
        name as IP*/
     ret = 0; /* default return value */
-    /* resultBuffer assumed to be 256 chars */
-    g_memset(resultBuffer, 0, 256);
+    g_memset(resultBuffer, 0, resultSize);
     if (originalDomainInfo[0] == '_')
     {
         /* we try to locate a number indicating what combobox index the user
@@ -326,7 +326,7 @@ xrdp_wm_parse_domain_information(char *originalDomainInfo, int comboMax,
          * Invalid chars are ignored in microsoft client therefore we use '_'
          * again. this sec '__' contains the split for index.*/
         pos = g_pos(&originalDomainInfo[1], "__");
-        if (pos > 0)
+        if (pos > 0 && (unsigned int)pos < resultSize)
         {
             /* an index is found we try to use it */
             LOG(LOG_LEVEL_DEBUG, "domain contains index char __");
@@ -348,12 +348,12 @@ xrdp_wm_parse_domain_information(char *originalDomainInfo, int comboMax,
                 }
             }
             /* pos limit the String to only contain the IP */
-            g_strncpy(resultBuffer, &originalDomainInfo[1], pos);
+            strlcpy(resultBuffer, &originalDomainInfo[1], pos + 1);
         }
         else
         {
             LOG(LOG_LEVEL_DEBUG, "domain does not contain _");
-            g_strncpy(resultBuffer, &originalDomainInfo[1], 255);
+            strlcpy(resultBuffer, &originalDomainInfo[1], resultSize);
         }
     }
     return ret;
@@ -486,7 +486,8 @@ xrdp_wm_show_edits(struct xrdp_wm *self, struct xrdp_bitmap *combo)
                     {
                         xrdp_wm_parse_domain_information(
                             self->session->client_info->domain,
-                            combo->data_list->count, 0, resultIP);
+                            combo->data_list->count, 0,
+                            resultIP, sizeof(resultIP));
                         g_strncpy(b->caption1, resultIP, 255);
                         b->edit_pos = utf8_char_count(b->caption1);
                     }
@@ -1001,7 +1002,8 @@ xrdp_login_wnd_create(struct xrdp_wm *self)
     combo->item_index = xrdp_wm_parse_domain_information(
                             self->session->client_info->domain,
                             combo->data_list->count, 1,
-                            resultIP /* just a dummy place holder, we ignore */ );
+                            resultIP,/* just a dummy place holder, we ignore */
+                            sizeof(resultIP));
     xrdp_wm_show_edits(self, combo);
 
     return 0;
