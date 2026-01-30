@@ -785,7 +785,9 @@ session_start_wrapped(struct login_info *login_info,
             }
             else
             {
-                utmp_login(window_manager_pid, s->display, login_info);
+                char dstr[32];
+                g_snprintf(dstr, sizeof(dstr), "%u", s->display);
+                utmp_login(window_manager_pid,  dstr, login_info);
                 LOG(LOG_LEVEL_INFO,
                     "Starting the xrdp channel server for display :%d",
                     s->display);
@@ -1034,8 +1036,11 @@ process_child_exit(struct session_data *sd,
                 "manager config problem",
                 sd->win_mgr, sd->params.display, wm_wait_time);
         }
-
-        utmp_logout(sd->win_mgr, sd->params.display, e);
+        {
+            char dstr[32];
+            g_snprintf(dstr, sizeof(dstr), "%u", sd->params.display);
+            utmp_logout(sd->win_mgr, dstr, e);
+        }
         sd->win_mgr = -1;
 
         if (sd->x_server > 0)

@@ -37,6 +37,8 @@
 #include <config_ac.h>
 #endif
 
+#include <ctype.h>
+
 #include "sessionrecord.h"
 #include "login_info.h"
 #include "log.h"
@@ -68,7 +70,7 @@ typedef struct utmp _utmp;
 #include "os_calls.h"
 #include "string_calls.h"
 
-#define XRDP_LINE_FORMAT "xrdp:%d"
+#define XRDP_LINE_FORMAT "xrdp:%s"
 // ut_id is a very small field on some platforms, so use the display
 // number in hex
 #define XRDP_ID_FORMAT ":%x"
@@ -104,6 +106,34 @@ str2memcpy(void *dest, const char *src, size_t n)
 
 /******************************************************************************/
 /**
+ * Get a display number from the display string
+ *
+ * Converts the display string to some sort of number to write to the
+ * extremely short ut_id field
+ * @param display string
+ * @return display number
+ */
+static unsigned int
+get_display_num(const char *display)
+{
+    unsigned int result = 0;
+    /* Look for the first digit in the string */
+    while (*display != '\0' && !isdigit(*display))
+    {
+        ++display;
+    }
+    /* convert consecutive digits to a number */
+    while (*display != '\0' && isdigit(*display))
+    {
+        result = (result * 10) + (*display - '0');
+        ++display;
+    }
+
+    return result;
+}
+
+/******************************************************************************/
+/**
  * Prepare the utmp struct and write it.
  *
  * @param pid PID of session manager
@@ -114,18 +144,26 @@ str2memcpy(void *dest, const char *src, size_t n)
  */
 
 static void
-add_xtmp_entry(int pid, int display, const struct login_info *login_info,
+add_xtmp_entry(int pid, const char *display,
+               const struct login_info *login_info,
                enum add_xtmp_mode mode, const struct proc_exit_status *e)
 {
-    char idbuff[16];
-    char str_display[16];
-
     _utmp ut;
+    /* For some string fields, use a formatting buffer one character larger
+     * than the eventual destination. This lets us use normal string
+     * functions to create the strings, and the terminator can then
+     * be omitted (if necessary) when filling in 'ut' */
+    char idbuff[sizeof(ut.ut_id) + 1];
+    char linebuff[sizeof(ut.ut_line) + 1];
+
     struct timeval tv;
 
+    /* Convert the display string to a number */
+    unsigned int display_num = get_display_num(display);
+
     g_memset(&ut, 0, sizeof(ut));
-    g_snprintf(str_display, sizeof(str_display), XRDP_LINE_FORMAT, display);
-    g_snprintf(idbuff, sizeof(idbuff), XRDP_ID_FORMAT, display);
+    g_snprintf(idbuff, sizeof(idbuff), XRDP_ID_FORMAT, display_num);
+    g_snprintf(linebuff, sizeof(linebuff), XRDP_LINE_FORMAT, display);
     gettimeofday(&tv, NULL);
 
     ut.ut_type = (mode == MODE_LOGIN) ? USER_PROCESS : DEAD_PROCESS;
@@ -138,7 +176,7 @@ add_xtmp_entry(int pid, int display, const struct login_info *login_info,
     {
         ut.ut_tv.tv_sec = tv.tv_sec;
         ut.ut_tv.tv_usec = tv.tv_usec;
-        str2memcpy(ut.ut_line, str_display, sizeof(ut.ut_line));
+        str2memcpy(ut.ut_line, linebuff, sizeof(ut.ut_line));
         if (login_info != NULL)
         {
             str2memcpy(ut.ut_user, login_info->username, sizeof(ut.ut_user));
@@ -170,7 +208,8 @@ add_xtmp_entry(int pid, int display, const struct login_info *login_info,
 }
 #else // USE_UTMP
 static void
-add_xtmp_entry(int pid, int display, const struct login_info *login_info,
+add_xtmp_entry(int pid, const char *display,
+               const struct login_info *login_info,
                short state, const struct proc_exit_status *e)
 {
 }
@@ -179,10 +218,11 @@ add_xtmp_entry(int pid, int display, const struct login_info *login_info,
 
 /******************************************************************************/
 void
-utmp_login(int pid, int display, const struct login_info *login_info)
+utmp_login(int pid, const char *display,
+           const struct login_info *login_info)
 {
     log_message(LOG_LEVEL_DEBUG,
-                "adding login info for utmp: %d - %d - %s - %s",
+                "adding login info for utmp: %d - %s - %s - %s",
                 pid, display, login_info->username, login_info->ip_addr);
 
     add_xtmp_entry(pid, display, login_info, MODE_LOGIN, NULL);
@@ -190,10 +230,11 @@ utmp_login(int pid, int display, const struct login_info *login_info)
 
 /******************************************************************************/
 void
-utmp_logout(int pid, int display, const struct proc_exit_status *exit_status)
+utmp_logout(int pid, const char *display,
+            const struct proc_exit_status *exit_status)
 {
 
-    log_message(LOG_LEVEL_DEBUG, "adding logout info for utmp: %d - %d",
+    log_message(LOG_LEVEL_DEBUG, "adding logout info for utmp: %d - %s",
                 pid, display);
 
     add_xtmp_entry(pid, display, NULL, MODE_LOGOUT, exit_status);
