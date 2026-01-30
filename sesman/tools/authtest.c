@@ -304,9 +304,9 @@ main(int argc, char **argv)
         rv = (int)errorcode;
         if (auth_info && rv == 0 && amp.command != NULL)
         {
-            int display = 10;
+            const char *display = "xrdp-test10";
             rv = auth_start_session(auth_info, display);
-            LOG(LOG_LEVEL_INFO, "auth_start_session(,%d) returned %d",
+            LOG(LOG_LEVEL_INFO, "auth_start_session(,%s) returned %d",
                 display, rv);
             if (rv == 0)
             {

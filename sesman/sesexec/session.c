@@ -694,6 +694,7 @@ session_start_wrapped(struct login_info *login_info,
     int display_pid;
     int window_manager_pid;
     enum scp_screate_status status = E_SCP_SCREATE_GENERAL_ERROR;
+    char displaystr[32];
 
     /* Set the secondary groups before starting the session to prevent
      * problems on PAM-based systems (see Linux pam_setcred(3)).
@@ -708,7 +709,8 @@ session_start_wrapped(struct login_info *login_info,
     }
 #endif
 
-    if (auth_start_session(login_info->auth_info, s->display) != 0)
+    snprintf(displaystr, sizeof(displaystr), "%d", s->display);
+    if (auth_start_session(login_info->auth_info, displaystr) != 0)
     {
         // Errors are logged by the auth module, as they are
         // specific to that module
