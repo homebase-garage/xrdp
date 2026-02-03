@@ -830,6 +830,25 @@ libxrdp_send_pointer_system(struct xrdp_session *session, int pointer_type)
 
 /*****************************************************************************/
 int EXPORT_CC
+libxrdp_send_pointer_position(struct xrdp_session *session, int x, int y)
+{
+    struct stream *s;
+
+    make_stream(s);
+    init_stream(s, 8192);
+    xrdp_rdp_init_data(session->rdp, s);
+    out_uint16_le(s, TS_PTRMSGTYPE_POSITION);
+    out_uint16_le(s, 0); /* pad */
+    out_uint16_le(s, x);
+    out_uint16_le(s, y);
+    s_mark_end(s);
+    xrdp_rdp_send_data(session->rdp, s, PDUTYPE2_POINTER);
+    free_stream(s);
+    return 0;
+}
+
+/*****************************************************************************/
+int EXPORT_CC
 libxrdp_send_pointer(struct xrdp_session *session, int cache_idx,
                      char *data, char *mask, int x, int y, int bpp,
                      int width, int height)
