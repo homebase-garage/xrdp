@@ -325,7 +325,7 @@ xrdp_mm_create_session(struct xrdp_mm *self)
             type = SCP_SESSION_TYPE_XVNC_UDS;
             break;
 
-        case  XORG_SESSION_CODE:
+        case XORG_SESSION_CODE:
             type = SCP_SESSION_TYPE_XORG;
             break;
 
@@ -2770,7 +2770,7 @@ static int
 xrdp_mm_process_create_session_response(struct xrdp_mm *self)
 {
     enum scp_screate_status status;
-    int display;
+    const char *display;
     struct guid guid;
 
     int rv;
@@ -2792,11 +2792,11 @@ xrdp_mm_process_create_session_response(struct xrdp_mm *self)
         if (status == E_SCP_SCREATE_OK)
         {
             xrdp_wm_log_msg(self->wm, LOG_LEVEL_INFO,
-                            "session is available on display %d for user %s",
+                            "session is available on display %s for user %s",
                             display, username);
 
             /* Carry on with the connect state machine */
-            self->display = display;
+            strlcpy(self->display, display, sizeof(self->display));
             self->guid = guid;
             xrdp_mm_connect_sm(self);
         }
@@ -2937,7 +2937,7 @@ cleanup_states(struct xrdp_mm *self)
         //self->sesman_trans = NULL; /* connection to sesman */
         self->chan_trans = NULL; /* connection to chansrv */
         self->delete_sesman_trans = 0;
-        self->display = 0; /* 10 for :10.0, 11 for :11.0, etc */
+        memset(self->display, '\0', sizeof(self->display));
         guid_clear(&self->guid);
         self->code = 0; /* ???_SESSION_CODE value */
         close_sesman_file_descriptors(self);
@@ -2966,7 +2966,7 @@ static int
 parse_chansrvport(const char *value, char *dest, int dest_size, int uid)
 {
     int rv = 0;
-    int dnum;
+    char dstr[MAX_DISPLAY_NAME_SIZE];
 
     if (value == NULL)
     {
@@ -2978,22 +2978,34 @@ parse_chansrvport(const char *value, char *dest, int dest_size, int uid)
     {
         const char *p = value + 8;
         const char *end = p;
-
-        /* Check next chars are digits */
-        while (isdigit(*end))
+        int is_numeric = 1;
+        /* Look for a ',' or ')' or '\0' */
+        while (*end != ',' && *end != ')' && *end != '\0')
         {
+            if (!isdigit(*end))
+            {
+                is_numeric = 0;
+            }
             ++end;
         }
 
-        if (end == p)
+        if (end == p || (unsigned int)(end - p) > (sizeof(dstr) - 1))
         {
             LOG(LOG_LEVEL_WARNING,
-                "Ignoring chansrvport string with bad display number '%s'",
+                "Ignoring chansrvport string with bad display string '%s'",
                 value);
             return -1;
         }
 
-        dnum = g_atoi(p);
+        memcpy(dstr, p, end - p);
+        dstr[end - p] = '\0';
+        if (is_numeric)
+        {
+            // X11 compatibility
+            int dnum = g_atoi(dstr);
+            (void)g_get_display_string_from_x11_display(
+                dnum, dstr, sizeof(dstr));
+        }
 
         if (*end == ',')
         {
@@ -3025,7 +3037,7 @@ parse_chansrvport(const char *value, char *dest, int dest_size, int uid)
             return -1;
         }
 
-        g_snprintf(dest, dest_size, XRDP_CHANSRV_STR, uid, dnum);
+        g_snprintf(dest, dest_size, XRDP_CHANSRV_STR, uid, dstr);
     }
     else
     {
@@ -5464,17 +5476,24 @@ xrdp_mm_setup_mod2(struct xrdp_mm *self)
 
     if (!g_is_wait_obj_set(self->wm->pro_layer->self_term_event))
     {
-        if (self->display < 0)
-        {
-            LOG(LOG_LEVEL_ERROR,
-                "Unexpected display value %d setting up module", self->display);
-            xrdp_mm_set_fatal(self, ERRINFO_SERVER_DWM_CRASH);
-        }
-        else if (self->code == XVNC_SESSION_CODE)
+        if (self->code == XVNC_SESSION_CODE)
         {
             if (self->use_sesman)
             {
-                g_snprintf(text, sizeof(text), "%d", 5900 + self->display);
+                // We have to make assumptions about the display format for
+                // classic VNC
+                int dnum = g_get_x11_display_from_display_string(self->display);
+                if (dnum < 0)
+                {
+                    LOG(LOG_LEVEL_ERROR,
+                        "Unexpected display value %s setting up VNC module",
+                        self->display);
+                    xrdp_mm_set_fatal(self, ERRINFO_SERVER_DWM_CRASH);
+                }
+                else
+                {
+                    g_snprintf(text, sizeof(text), "%d", 5900 + dnum);
+                }
             }
         }
         else if (self->code == XORG_SESSION_CODE ||

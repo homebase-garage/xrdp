@@ -28,6 +28,7 @@
 #include <sys/un.h>
 #include <errno.h>
 
+#include "xrdp_constants.h"
 #include "xrdp_sockets.h"
 #include "os_calls.h"
 #include "string_calls.h"
@@ -35,10 +36,9 @@
 int main(int argc, char **argv)
 {
     int sck;
-    int dis;
+    char disstr[MAX_DISPLAY_NAME_SIZE];
     struct sockaddr_un sa;
     size_t len;
-    char *display;
 
     if (argc != 1)
     {
@@ -47,23 +47,15 @@ int main(int argc, char **argv)
         return 0;
     }
 
-    display = getenv("DISPLAY");
-
-    if (display == 0)
+    if (g_get_display_string(disstr, sizeof(disstr)) < 0)
     {
-        printf("display not set\n");
+        printf("Can't find teh display from the environment\n");
         return 1;
     }
 
-    dis = g_get_display_num_from_display(display);
-    if (dis < 0)
-    {
-        printf("Can't parse DISPLAY='%s'\n", display);
-        return 1;
-    }
     memset(&sa, 0, sizeof(sa));
     sa.sun_family = AF_UNIX;
-    sprintf(sa.sun_path, XRDP_DISCONNECT_STR, g_getuid(), dis);
+    g_sprintf(sa.sun_path, XRDP_DISCONNECT_STR, g_getuid(), disstr);
 
     if (access(sa.sun_path, F_OK) != 0)
     {

@@ -45,13 +45,13 @@
 #define SCP_LISTEN_PORT_BASE_STR   "sesman.socket"
 
 /* names of socket files within XRDP_SOCKET_PATH, qualified by
- * display number */
-#define XRDP_CHANSRV_BASE_STR      "xrdp_chansrv_socket_%d"
-#define CHANSRV_PORT_OUT_BASE_STR  "xrdp_chansrv_audio_out_socket_%d"
-#define CHANSRV_PORT_IN_BASE_STR   "xrdp_chansrv_audio_in_socket_%d"
-#define CHANSRV_API_BASE_STR       "xrdpapi_%d"
-#define XRDP_X11RDP_BASE_STR       "xrdp_display_%d"
-#define XRDP_DISCONNECT_BASE_STR   "xrdp_disconnect_display_%d"
+ * display name */
+#define XRDP_CHANSRV_BASE_STR      "xrdp_chansrv_socket_%s"
+#define CHANSRV_PORT_OUT_BASE_STR  "xrdp_chansrv_audio_out_socket_%s"
+#define CHANSRV_PORT_IN_BASE_STR   "xrdp_chansrv_audio_in_socket_%s"
+#define CHANSRV_API_BASE_STR       "xrdpapi_%s"
+#define XRDP_X11RDP_BASE_STR       "xrdp_display_%s"
+#define XRDP_DISCONNECT_BASE_STR   "xrdp_disconnect_display_%s"
 
 /* fullpath declarations */
 #define XRDP_CHANSRV_STR      XRDP_SOCKET_PATH "/" XRDP_CHANSRV_BASE_STR

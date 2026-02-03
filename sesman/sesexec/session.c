@@ -49,6 +49,7 @@
 #include "os_calls.h"
 #include "sesexec.h"
 #include "sessionrecord.h"
+#include "ssl_calls.h"
 #include "string_calls.h"
 #include "trans.h"
 #include "xauth.h"
@@ -62,6 +63,7 @@ struct session_data
     pid_t chansrv; ///< PID of chansrv
     time_t start_time;
     unsigned int connect_count;
+    char display[MAX_DISPLAY_NAME_SIZE]; // Set by session_start()
     struct session_parameters params;
     // Flexible array member used to store strings in params and ip_addr;
 #ifdef __cplusplus
@@ -189,7 +191,7 @@ dumpItemsToString(struct list *self, char *outstr, int len)
 /******************************************************************************/
 static void
 start_chansrv(const struct login_info *login_info,
-              const struct session_parameters *s,
+              const struct session_data *sd,
               void *closure /* unused */)
 {
     struct list *chansrv_params = list_create();
@@ -211,7 +213,7 @@ start_chansrv(const struct login_info *login_info,
     }
     else
     {
-        env_set_user(login_info->uid, 0, s->display,
+        env_set_user(login_info->uid,
                      g_cfg->env_names,
                      g_cfg->env_values);
 
@@ -228,36 +230,35 @@ start_chansrv(const struct login_info *login_info,
 /******************************************************************************/
 static void
 start_window_manager(const struct login_info *login_info,
-                     const struct session_parameters *s,
+                     const struct session_data *sd,
                      void *closure /* unused */)
 {
     char text[256];
+    const struct session_parameters *sp = &sd->params;
 
     env_set_user(login_info->uid,
-                 0,
-                 s->display,
                  g_cfg->env_names,
                  g_cfg->env_values);
 
     auth_set_env(login_info->auth_info);
     LOG_DEVEL_LEAKING_FDS("window manager", 3, -1);
 
-    if (s->directory[0] != '\0')
+    if (sp->directory[0] != '\0')
     {
         if (g_cfg->sec.allow_alternate_shell)
         {
-            g_set_current_dir(s->directory);
+            g_set_current_dir(sp->directory);
         }
         else
         {
             LOG(LOG_LEVEL_WARNING,
                 "Directory change to %s requested, but not "
                 "allowed by AllowAlternateShell config value.",
-                s->directory);
+                sp->directory);
         }
     }
 
-    if (s->shell[0] != '\0')
+    if (sp->shell[0] != '\0')
     {
         if (g_cfg->sec.allow_alternate_shell)
         {
@@ -269,27 +270,28 @@ start_window_manager(const struct login_info *login_info,
                 LOG(LOG_LEVEL_INFO,
                     "Setting variable '%s' to the specified shell of '%s'",
                     g_cfg->sec.pass_shell_as_env,
-                    s->shell);
-                g_setenv_log(g_cfg->sec.pass_shell_as_env, s->shell, 1);
+                    sp->shell);
+                g_setenv_log(g_cfg->sec.pass_shell_as_env, sp->shell, 1);
             }
             else
             {
                 // Try to execute the shell directly (if permitted)
-                if (g_strchr(s->shell, ' ') != 0 || g_strchr(s->shell, '\t') != 0)
+                if (g_strchr(sp->shell, ' ') != 0 ||
+                        g_strchr(sp->shell, '\t') != 0)
                 {
                     LOG(LOG_LEVEL_INFO,
                         "Using user requested window manager on "
-                        "display %u with embedded arguments using a shell: %s",
-                        s->display, s->shell);
-                    const char *argv[] = {"sh", "-c", s->shell, NULL};
+                        "display %s with embedded arguments using a shell: %s",
+                        sd->display, sp->shell);
+                    const char *argv[] = {"sh", "-c", sp->shell, NULL};
                     g_execvp("/bin/sh", (char **)argv);
                 }
                 else
                 {
                     LOG(LOG_LEVEL_INFO,
                         "Using user requested window manager on "
-                        "display %d: %s", s->display, s->shell);
-                    g_execlp3(s->shell, s->shell, 0);
+                        "display %s %s", sd->display, sp->shell);
+                    g_execlp3(sp->shell, sp->shell, 0);
                 }
             }
         }
@@ -298,13 +300,13 @@ start_window_manager(const struct login_info *login_info,
             LOG(LOG_LEVEL_WARNING,
                 "Shell %s requested by user, but not allowed by "
                 "AllowAlternateShell config value.",
-                s->shell);
+                sp->shell);
         }
     }
     else
     {
-        LOG(LOG_LEVEL_DEBUG, "The user session on display %u did "
-            "not request a specific window manager", s->display);
+        LOG(LOG_LEVEL_DEBUG, "The user session on display %s did "
+            "not request a specific window manager", sd->display);
     }
 
     /* try to execute user window manager if enabled */
@@ -315,8 +317,8 @@ start_window_manager(const struct login_info *login_info,
         if (g_file_exist(text))
         {
             LOG(LOG_LEVEL_INFO,
-                "Using window manager on display %u"
-                " from user home directory: %s", s->display, text);
+                "Using window manager on display %s"
+                " from user home directory: %s", sd->display, text);
             g_execlp3(text, g_cfg->user_wm, 0);
         }
         else
@@ -329,26 +331,26 @@ start_window_manager(const struct login_info *login_info,
     }
 
     LOG(LOG_LEVEL_INFO,
-        "Using the default window manager on display %u: %s",
-        s->display, g_cfg->default_wm);
+        "Using the default window manager on display %s: %s",
+        sd->display, g_cfg->default_wm);
     g_execlp3(g_cfg->default_wm, g_cfg->default_wm, 0);
 
     /* still a problem starting window manager just start xterm */
     LOG(LOG_LEVEL_WARNING,
-        "No window manager on display %u started, "
+        "No window manager on display %s started, "
         "so falling back to starting xterm for user debugging",
-        s->display);
+        sd->display);
     g_execlp3("xterm", "xterm", 0);
 
     /* should not get here */
     LOG(LOG_LEVEL_ERROR, "A fatal error has occurred attempting to start "
-        "the window manager on display %u, aborting connection",
-        s->display);
+        "the window manager on display %s, aborting connection",
+        sd->display);
 }
 
 /******************************************************************************/
 static struct list *
-prepare_xorg_xserver_params(const struct session_parameters *s,
+prepare_xorg_xserver_params(const struct session_data *sd,
                             const char *authfile)
 {
 
@@ -369,18 +371,18 @@ prepare_xorg_xserver_params(const struct session_parameters *s,
         if (g_cfg->sec.xorg_no_new_privileges && g_no_new_privs() != 0)
         {
             LOG(LOG_LEVEL_WARNING,
-                "[session start] (display %u): Failed to disable "
+                "[session start] (display :%d): Failed to disable "
                 "setuid on X server: %s",
-                s->display, g_get_strerror());
+                sd->params.x11_display, g_get_strerror());
         }
 
-        g_snprintf(screen, sizeof(screen), ":%u", s->display);
+        g_snprintf(screen, sizeof(screen), ":%d", sd->params.x11_display);
 
         /* some args are passed via env vars */
-        g_snprintf(text, sizeof(text), "%d", s->width);
+        g_snprintf(text, sizeof(text), "%d", sd->params.width);
         g_setenv_log("XRDP_START_WIDTH", text, 1);
 
-        g_snprintf(text, sizeof(text), "%d", s->height);
+        g_snprintf(text, sizeof(text), "%d", sd->params.height);
         g_setenv_log("XRDP_START_HEIGHT", text, 1);
 
         g_snprintf(text, sizeof(text), "%d", g_cfg->sess.max_idle_time);
@@ -410,8 +412,178 @@ prepare_xorg_xserver_params(const struct session_parameters *s,
 
 /******************************************************************************/
 /**
+ * Create an Xvnc password file
+ *
+ * @param x11_display X11 display number
+ * @return Name of passwd file, or NULL if no memory.
+ *
+ * env_set_user() must be called before calling this function
+ */
+static char *
+get_xvnc_passwd_file_name(int x11_display)
+{
+    char *result = NULL;
+    int len;
+
+    char *pw_username = NULL;
+    char *pw_dir = NULL;
+    char hostname[256];
+    int error;
+
+    /* Get parameters needed for VNC filename */
+    hostname[sizeof(hostname) - 1] = '\0';
+    g_gethostname(hostname, sizeof(hostname));
+    error = g_getuser_info_by_uid(g_getuid(), &pw_username, 0, 0, &pw_dir, 0);
+
+    if (error != 0 || pw_username == NULL || pw_dir == NULL)
+    {
+        LOG(LOG_LEVEL_ERROR, "Can't get parameters for XVnc passwd file");
+    }
+    else
+    {
+        if (0 == g_cfg->auth_file_path)
+        {
+            /* if no auth_file_path is set, then we go for
+             $HOME/.vnc/sesman_passwd-USERNAME@HOSTNAME:DISPLAY */
+            if (!g_directory_exist(".vnc"))
+            {
+                if (g_mkdir(".vnc") < 0)
+                {
+                    LOG(LOG_LEVEL_ERROR,
+                        "Error creating .vnc directory: %s",
+                        g_get_strerror());
+                }
+            }
+
+            len = g_snprintf(NULL, 0, "%s/.vnc/sesman_passwd-%s@%s:%d",
+                             pw_dir, pw_username, hostname, x11_display);
+            ++len; // Allow for terminator
+
+            result = (char *) g_malloc(len, 1);
+            if (result != NULL)
+            {
+                /* Try legacy names first, remove if found */
+                g_snprintf(result, len,
+                           "%s/.vnc/sesman_%s_passwd:%d",
+                           pw_dir, pw_username, x11_display);
+                if (g_file_exist(result))
+                {
+                    LOG(LOG_LEVEL_WARNING, "Removing old "
+                        "password file %s", result);
+                    g_file_delete(result);
+                }
+                g_snprintf(result, len,
+                           "%s/.vnc/sesman_%s_passwd",
+                           pw_dir, pw_username);
+                if (g_file_exist(result))
+                {
+                    LOG(LOG_LEVEL_WARNING, "Removing insecure "
+                        "password file %s", result);
+                    g_file_delete(result);
+                }
+                g_snprintf(result, len,
+                           "%s/.vnc/sesman_passwd-%s@%s:%d",
+                           pw_dir, pw_username, hostname, x11_display);
+            }
+        }
+        else
+        {
+            /* we use auth_file_path as requested */
+            len = g_snprintf(NULL, 0, g_cfg->auth_file_path, pw_username);
+
+            ++len; // Allow for terminator
+            result = (char *) g_malloc(len, 1);
+            if (result != NULL)
+            {
+                g_snprintf(result, len,
+                           g_cfg->auth_file_path, pw_username);
+            }
+        }
+
+        if (result == NULL)
+        {
+            LOG(LOG_LEVEL_ERROR,
+                "Can't allocate memory for Xvnc passwd file name");
+        }
+        else
+        {
+            LOG_DEVEL(LOG_LEVEL_DEBUG, "pass file: %s", result);
+        }
+    }
+    g_free(pw_username);
+    g_free(pw_dir);
+
+    return result;
+}
+
+/******************************************************************************/
+static int
+set_xvnc_passwd(const char *filename, const char *passwd)
+{
+    char encryptedPasswd[16];
+    char key[24];
+    char passwd_hash[20];
+    char passwd_hash_text[40];
+    int fd;
+    int passwd_bytes;
+    void *des;
+    void *sha1;
+
+    if (filename == NULL)
+    {
+        LOG(LOG_LEVEL_WARNING, "Cannot write VNC password hash to NULL file");
+        return 1;
+    }
+
+    /*
+     * If we're in FIPS mode, do not write the GUID to disk after it's
+     * been encrypted with an insecure algorithm.
+     */
+    if (g_fips_mode_enabled())
+    {
+        LOG(LOG_LEVEL_ERROR, "Can't create VNC password file in FIPS mode");
+        return 1;
+    }
+    /* create password hash from password */
+    passwd_bytes = (passwd == NULL) ? 0 : strlen(passwd);
+    sha1 = ssl_sha1_info_create();
+    ssl_sha1_clear(sha1);
+    ssl_sha1_transform(sha1, "xrdp_vnc", 8);
+    ssl_sha1_transform(sha1, passwd, passwd_bytes);
+    ssl_sha1_transform(sha1, passwd, passwd_bytes);
+    ssl_sha1_complete(sha1, passwd_hash);
+    ssl_sha1_info_delete(sha1);
+    g_snprintf(passwd_hash_text, sizeof(passwd_hash_text),
+               "%2.2x%2.2x%2.2x%2.2x",
+               (tui8)passwd_hash[0], (tui8)passwd_hash[1],
+               (tui8)passwd_hash[2], (tui8)passwd_hash[3]);
+    passwd = passwd_hash_text;
+
+    /* create file from password */
+    g_memset(encryptedPasswd, 0, sizeof(encryptedPasswd));
+    g_strncpy(encryptedPasswd, passwd, 8);
+    g_memset(key, 0, sizeof(key));
+    g_mirror_memcpy(key, g_fixedkey, 8);
+    des = ssl_des3_encrypt_info_create(key, 0);
+    ssl_des3_encrypt(des, 8, encryptedPasswd, encryptedPasswd);
+    ssl_des3_info_delete(des);
+    fd = g_file_open_ex(filename, 0, 1, 1, 1);
+    if (fd == -1)
+    {
+        LOG(LOG_LEVEL_WARNING,
+            "Cannot write VNC password hash to file %s: %s",
+            filename, g_get_strerror());
+        return 1;
+    }
+    g_file_write(fd, encryptedPasswd, 8);
+    g_file_close(fd);
+    return 0;
+}
+
+/******************************************************************************/
+/**
  * Prepare a list of parameters for the Xvnc X server
- * @param s Session parameters
+ * @param sd Session data
  * @param authfile XAUTHORITY file
  * @param passwd_file VNC password file, or NULL
  * @param port UDS port to connect to, or NULL
@@ -420,7 +592,7 @@ prepare_xorg_xserver_params(const struct session_parameters *s,
  * One of passwd_file and port must be set
  */
 static struct list *
-prepare_xvnc_xserver_params(const struct session_parameters *s,
+prepare_xvnc_xserver_params(const struct session_data *sd,
                             const char *authfile,
                             const char *passwd_file,
                             const char *port)
@@ -428,19 +600,17 @@ prepare_xvnc_xserver_params(const struct session_parameters *s,
     char screen[32] = {0}; /* display number */
     char geometry[32] = {0};
     char depth[32] = {0};
-    char guid_str[GUID_STR_SIZE];
     const char *xserver;
+    const struct session_parameters *sp = &sd->params;
 
     struct list *params = list_create();
     if (params != NULL)
     {
         params->auto_free = 1;
 
-        g_snprintf(screen, sizeof(screen), ":%u", s->display);
-        g_snprintf(geometry, sizeof(geometry), "%dx%d", s->width, s->height);
-        g_snprintf(depth, sizeof(depth), "%d", s->bpp);
-
-        guid_to_str(&s->guid, guid_str);
+        g_snprintf(screen, sizeof(screen), ":%d", sp->x11_display);
+        g_snprintf(geometry, sizeof(geometry), "%dx%d", sp->width, sp->height);
+        g_snprintf(depth, sizeof(depth), "%d", sp->bpp);
 
         /* get path of Xvnc from config */
         xserver = (const char *)list_get_item(g_cfg->vnc_params, 0);
@@ -456,7 +626,6 @@ prepare_xvnc_xserver_params(const struct session_parameters *s,
         if (passwd_file != NULL)
         {
             /* RFB authorization */
-            env_check_password_file(passwd_file, guid_str);
             list_add_strdup_multi(params,
                                   "-rfbauth", passwd_file,
                                   LIST_ADD_STRDUP_TERM);
@@ -493,7 +662,7 @@ prepare_xvnc_xserver_params(const struct session_parameters *s,
 /* Either execs the X server, or returns */
 static void
 start_x_server(const struct login_info *login_info,
-               const struct session_parameters *s,
+               const struct session_data *sd,
                void *closure /* unused */)
 {
     char authfile[256]; /* The filename for storing xauth information */
@@ -501,22 +670,19 @@ start_x_server(const struct login_info *login_info,
     char *passwd_file = NULL;
     struct list *xserver_params = NULL;
     int unknown_session_type = 0;
+    const struct session_parameters *sp = &sd->params;
 
-    if (s->type == SCP_SESSION_TYPE_XVNC)
+    env_set_user(login_info->uid,
+                 g_cfg->env_names,
+                 g_cfg->env_values);
+
+    if (sp->type == SCP_SESSION_TYPE_XVNC)
     {
-        env_set_user(login_info->uid,
-                     &passwd_file,
-                     s->display,
-                     g_cfg->env_names,
-                     g_cfg->env_values);
-    }
-    else
-    {
-        env_set_user(login_info->uid,
-                     0,
-                     s->display,
-                     g_cfg->env_names,
-                     g_cfg->env_values);
+        char guid_str[GUID_STR_SIZE];
+        passwd_file = get_xvnc_passwd_file_name(sp->x11_display);
+
+        guid_to_str(&sp->guid, guid_str);
+        set_xvnc_passwd(passwd_file, guid_str);
     }
 
     /* prepare the Xauthority stuff */
@@ -531,31 +697,32 @@ start_x_server(const struct login_info *login_info,
     }
 
     /* Add the entry in XAUTHORITY file or exit if error */
-    if (add_xauth_cookie(s->display, authfile) != 0)
+    if (sp->x11_display >= 0 &&
+            add_xauth_cookie(sp->x11_display, authfile) != 0)
     {
         LOG(LOG_LEVEL_ERROR,
-            "Error setting the xauth cookie for display %u in file %s",
-            s->display, authfile);
+            "Error setting the xauth cookie for display %s in file %s",
+            sd->display, authfile);
     }
     else
     {
-        switch (s->type)
+        switch (sp->type)
         {
                 char port[256];
 
             case SCP_SESSION_TYPE_XORG:
-                xserver_params = prepare_xorg_xserver_params(s, authfile);
+                xserver_params = prepare_xorg_xserver_params(sd, authfile);
                 break;
 
             case SCP_SESSION_TYPE_XVNC:
-                xserver_params = prepare_xvnc_xserver_params(s, authfile,
+                xserver_params = prepare_xvnc_xserver_params(sd, authfile,
                                  passwd_file, NULL);
                 break;
 
             case SCP_SESSION_TYPE_XVNC_UDS:
                 g_snprintf(port, sizeof(port), XRDP_X11RDP_STR,
-                           login_info->uid, s->display);
-                xserver_params = prepare_xvnc_xserver_params(s, authfile,
+                           login_info->uid, sd->display);
+                xserver_params = prepare_xvnc_xserver_params(sd, authfile,
                                  NULL, port);
                 break;
 
@@ -570,13 +737,13 @@ start_x_server(const struct login_info *login_info,
         else if (unknown_session_type)
         {
             LOG(LOG_LEVEL_ERROR, "Unknown session type: %d",
-                s->type);
+                sp->type);
         }
         else
         {
             /* fire up X server */
-            LOG(LOG_LEVEL_INFO, "Starting X server on display %u: %s",
-                s->display,
+            LOG(LOG_LEVEL_INFO, "Starting X server on display %s: %s",
+                sd->display,
                 dumpItemsToString(xserver_params, execvpparams, 2048));
             LOG_DEVEL_LEAKING_FDS("X server", 3, -1);
             g_execvp_list((const char *)xserver_params->items[0],
@@ -588,8 +755,8 @@ start_x_server(const struct login_info *login_info,
     g_free(passwd_file);
     list_delete(xserver_params);
     LOG(LOG_LEVEL_ERROR, "A fatal error has occurred attempting "
-        "to start the X server on display %u, aborting connection",
-        s->display);
+        "to start the X server on display %s, aborting connection",
+        sd->display);
 }
 
 /******************************************************************************/
@@ -598,10 +765,10 @@ start_x_server(const struct login_info *login_info,
 static int
 fork_child(
     void (*runproc)(const struct login_info *,
-                    const struct session_parameters *,
+                    const struct session_data *,
                     void *closure),
     const struct login_info *login_info,
-    const struct session_parameters *s,
+    const struct session_data *sd,
     pid_t group_pid,
     void *closure)
 {
@@ -613,7 +780,7 @@ fork_child(
         {
             (void)g_setpgid(0, group_pid);
         }
-        runproc(login_info, s, closure);
+        runproc(login_info, sd, closure);
         g_exit(0);
     }
 
@@ -694,7 +861,6 @@ session_start_wrapped(struct login_info *login_info,
     int display_pid;
     int window_manager_pid;
     enum scp_screate_status status = E_SCP_SCREATE_GENERAL_ERROR;
-    char displaystr[32];
 
     /* Set the secondary groups before starting the session to prevent
      * problems on PAM-based systems (see Linux pam_setcred(3)).
@@ -709,8 +875,7 @@ session_start_wrapped(struct login_info *login_info,
     }
 #endif
 
-    snprintf(displaystr, sizeof(displaystr), "%d", s->display);
-    if (auth_start_session(login_info->auth_info, displaystr) != 0)
+    if (auth_start_session(login_info->auth_info, sd->display) != 0)
     {
         // Errors are logged by the auth module, as they are
         // specific to that module
@@ -724,15 +889,15 @@ session_start_wrapped(struct login_info *login_info,
     if (g_setsid() < 0)
     {
         LOG(LOG_LEVEL_WARNING,
-            "[session start] (display %d): setsid failed - pid %d",
-            s->display, g_getpid());
+            "[session start] (display %s): setsid failed - pid %d",
+            sd->display, g_getpid());
     }
 
     if (g_setlogin(login_info->username) < 0)
     {
         LOG(LOG_LEVEL_WARNING,
-            "[session start] (display %d): setlogin failed for user %s - pid %d",
-            s->display, login_info->username, g_getpid());
+            "[session start] (display %s): setlogin failed for user %s - pid %d",
+            sd->display, login_info->username, g_getpid());
     }
 #endif
 
@@ -743,14 +908,14 @@ session_start_wrapped(struct login_info *login_info,
      * without affecting sesexec (and vice-versa). This is particularly
      * important when debugging sesexec as we don't want a SIGINT in
      * the debugger to be passed to the children */
-    display_pid = fork_child(start_x_server, login_info, s, 0, NULL);
+    display_pid = fork_child(start_x_server, login_info, sd, 0, NULL);
     if (display_pid > 0)
     {
         enum xwait_status xws;
         xws = wait_for_xserver(login_info->uid,
                                g_cfg->env_names,
                                g_cfg->env_values,
-                               s->display);
+                               s->x11_display);
 
         if (xws != XW_STATUS_OK)
         {
@@ -774,12 +939,12 @@ session_start_wrapped(struct login_info *login_info,
         }
         else
         {
-            LOG(LOG_LEVEL_INFO, "X server :%d is working", s->display);
-            LOG(LOG_LEVEL_INFO, "Starting window manager for display :%d",
-                s->display);
+            LOG(LOG_LEVEL_INFO, "Display %s is working", sd->display);
+            LOG(LOG_LEVEL_INFO, "Starting window manager for display %s",
+                sd->display);
 
             window_manager_pid = fork_child(start_window_manager,
-                                            login_info, s, display_pid, NULL);
+                                            login_info, sd, display_pid, NULL);
             if (window_manager_pid < 0)
             {
                 g_sigterm(display_pid);
@@ -787,15 +952,13 @@ session_start_wrapped(struct login_info *login_info,
             }
             else
             {
-                char dstr[32];
-                g_snprintf(dstr, sizeof(dstr), "%u", s->display);
-                utmp_login(window_manager_pid,  dstr, login_info);
+                utmp_login(window_manager_pid, sd->display, login_info);
                 LOG(LOG_LEVEL_INFO,
-                    "Starting the xrdp channel server for display :%d",
-                    s->display);
+                    "Starting the xrdp channel server for display %s",
+                    sd->display);
 
                 chansrv_pid = fork_child(start_chansrv, login_info,
-                                         s, display_pid, NULL);
+                                         sd, display_pid, NULL);
 
                 sd->win_mgr = window_manager_pid;
                 sd->x_server = display_pid;
@@ -806,9 +969,9 @@ session_start_wrapped(struct login_info *login_info,
                 {
                     // Tell the caller we've started
                     LOG(LOG_LEVEL_INFO,
-                        "Session in progress on display :%d. Waiting until the "
+                        "Session in progress on display %s. Waiting until the "
                         "window manager (pid %d) exits to end the session",
-                        s->display, window_manager_pid);
+                        sd->display, window_manager_pid);
 
                     status = E_SCP_SCREATE_OK;
                 }
@@ -832,7 +995,8 @@ session_start(struct login_info *login_info,
               const struct session_parameters *sp,
               struct session_data **session_data)
 {
-    enum scp_screate_status status = E_SCP_SCREATE_GENERAL_ERROR;
+    enum scp_screate_status status = E_SCP_SCREATE_OK;
+
     /* Create the session_data struct first */
     struct session_data *sd = session_data_new(sp);
     if (sd == NULL)
@@ -841,15 +1005,38 @@ session_start(struct login_info *login_info,
     }
     else
     {
-        status = session_start_wrapped(login_info, sp, sd);
+        if (sp->x11_display >= 0)
+        {
+            /* Initialise the display name for logging purposes */
+            g_get_display_string_from_x11_display(sp->x11_display,
+                                                  sd->display,
+                                                  MAX_DISPLAY_NAME_SIZE);
+            /* Add the DISPLAY to the list of environment variables we
+             * set for all the sub-processes */
+            char displayname[32];
+            snprintf(displayname, sizeof(displayname), ":%d",
+                     sp->x11_display);
+
+            if (!list_add_strdup(g_cfg->env_names, "DISPLAY") ||
+                    !list_add_strdup(g_cfg->env_values, displayname))
+            {
+                session_data_free(sd);
+                status = E_SCP_SCREATE_NO_MEMORY;
+            }
+        }
+
         if (status == E_SCP_SCREATE_OK)
         {
-            *session_data = sd;
-        }
-        else
-        {
-            *session_data = NULL;
-            session_data_free(sd);
+            status = session_start_wrapped(login_info, sp, sd);
+            if (status == E_SCP_SCREATE_OK)
+            {
+                *session_data = sd;
+            }
+            else
+            {
+                *session_data = NULL;
+                session_data_free(sd);
+            }
         }
     }
 
@@ -858,14 +1045,16 @@ session_start(struct login_info *login_info,
 
 /******************************************************************************/
 static int
-cleanup_sockets(int uid, int display)
+cleanup_sockets(struct session_data *sd)
 {
     LOG_DEVEL(LOG_LEVEL_INFO, "cleanup_sockets:");
 
     char file[XRDP_SOCKETS_MAXPATH];
     int error = 0;
 
-    g_snprintf(file, sizeof(file), CHANSRV_PORT_OUT_STR, uid, display);
+    int uid = g_login_info->uid;
+
+    g_snprintf(file, sizeof(file), CHANSRV_PORT_OUT_STR, uid, sd->display);
     if (g_file_exist(file))
     {
         LOG(LOG_LEVEL_DEBUG, "cleanup_sockets: deleting %s", file);
@@ -878,7 +1067,7 @@ cleanup_sockets(int uid, int display)
         }
     }
 
-    g_snprintf(file, sizeof(file), CHANSRV_PORT_IN_STR, uid, display);
+    g_snprintf(file, sizeof(file), CHANSRV_PORT_IN_STR, uid, sd->display);
     if (g_file_exist(file))
     {
         LOG(LOG_LEVEL_DEBUG, "cleanup_sockets: deleting %s", file);
@@ -891,7 +1080,7 @@ cleanup_sockets(int uid, int display)
         }
     }
 
-    g_snprintf(file, sizeof(file), XRDP_CHANSRV_STR, uid, display);
+    g_snprintf(file, sizeof(file), XRDP_CHANSRV_STR, uid, sd->display);
     if (g_file_exist(file))
     {
         LOG(LOG_LEVEL_DEBUG, "cleanup_sockets: deleting %s", file);
@@ -904,7 +1093,7 @@ cleanup_sockets(int uid, int display)
         }
     }
 
-    g_snprintf(file, sizeof(file), CHANSRV_API_STR, uid, display);
+    g_snprintf(file, sizeof(file), CHANSRV_API_STR, uid, sd->display);
     if (g_file_exist(file))
     {
         LOG(LOG_LEVEL_DEBUG, "cleanup_sockets: deleting %s", file);
@@ -920,7 +1109,7 @@ cleanup_sockets(int uid, int display)
     /* the following files should be deleted by xorgxrdp
      * but just in case the deletion failed */
 
-    g_snprintf(file, sizeof(file), XRDP_X11RDP_STR, uid, display);
+    g_snprintf(file, sizeof(file), XRDP_X11RDP_STR, uid, sd->display);
     if (g_file_exist(file))
     {
         LOG(LOG_LEVEL_DEBUG, "cleanup_sockets: deleting %s", file);
@@ -933,7 +1122,7 @@ cleanup_sockets(int uid, int display)
         }
     }
 
-    g_snprintf(file, sizeof(file), XRDP_DISCONNECT_STR, uid, display);
+    g_snprintf(file, sizeof(file), XRDP_DISCONNECT_STR, uid, sd->display);
     if (g_file_exist(file))
     {
         LOG(LOG_LEVEL_DEBUG, "cleanup_sockets: deleting %s", file);
@@ -997,16 +1186,16 @@ process_child_exit(struct session_data *sd,
 {
     if (pid == sd->x_server)
     {
-        LOG(LOG_LEVEL_INFO, "X server pid %d on display :%d finished",
-            sd->x_server, sd->params.display);
+        LOG(LOG_LEVEL_INFO, "X server pid %d on display %s finished",
+            sd->x_server, sd->display);
         sd->x_server = -1;
         // No other action - window manager should be going soon
     }
     else if (pid == sd->chansrv)
     {
         LOG(LOG_LEVEL_INFO,
-            "xrdp channel server pid %d on display :%d finished",
-            sd->chansrv, sd->params.display);
+            "xrdp channel server pid %d on display %s finished",
+            sd->chansrv, sd->display);
         sd->chansrv = -1;
     }
     else if (pid == sd->win_mgr)
@@ -1016,53 +1205,50 @@ process_child_exit(struct session_data *sd,
         if (e->reason == E_PXR_STATUS_CODE && e->val == 0)
         {
             LOG(LOG_LEVEL_INFO,
-                "Window manager (pid %d, display %d) "
+                "Window manager (pid %d, display %s) "
                 "finished normally in %d secs",
-                sd->win_mgr, sd->params.display, wm_wait_time);
+                sd->win_mgr, sd->display, wm_wait_time);
         }
         else
         {
             char reason[128];
             exit_status_to_str(e, reason, sizeof(reason));
 
-            LOG(LOG_LEVEL_WARNING, "Window manager (pid %d, display %d) "
+            LOG(LOG_LEVEL_WARNING, "Window manager (pid %d, display %s) "
                 "exited with %s. This "
                 "could indicate a window manager config problem",
-                sd->win_mgr, sd->params.display, reason);
+                sd->win_mgr, sd->display, reason);
         }
         if (wm_wait_time < 10)
         {
             /* This could be a config issue. Log a significant error */
-            LOG(LOG_LEVEL_WARNING, "Window manager (pid %d, display %d) "
+            LOG(LOG_LEVEL_WARNING, "Window manager (pid %d, display %s) "
                 "exited quickly (%d secs). This could indicate a window "
                 "manager config problem",
-                sd->win_mgr, sd->params.display, wm_wait_time);
+                sd->win_mgr, sd->display, wm_wait_time);
         }
-        {
-            char dstr[32];
-            g_snprintf(dstr, sizeof(dstr), "%u", sd->params.display);
-            utmp_logout(sd->win_mgr, dstr, e);
-        }
+
+        utmp_logout(sd->win_mgr, sd->display, e);
         sd->win_mgr = -1;
 
         if (sd->x_server > 0)
         {
-            LOG(LOG_LEVEL_INFO, "Terminating X server (pid %d) on display :%d",
-                sd->x_server, sd->params.display);
+            LOG(LOG_LEVEL_INFO, "Terminating X server (pid %d) on display %s",
+                sd->x_server, sd->display);
             g_sigterm(sd->x_server);
         }
 
         if (sd->chansrv > 0)
         {
             LOG(LOG_LEVEL_INFO, "Terminating the xrdp channel server (pid %d) "
-                "on display :%d", sd->chansrv, sd->params.display);
+                "on display %s", sd->chansrv, sd->display);
             g_sigterm(sd->chansrv);
         }
     }
 
     if (!session_active(sd))
     {
-        cleanup_sockets(g_login_info->uid, sd->params.display);
+        cleanup_sockets(sd);
     }
 }
 
@@ -1102,6 +1288,13 @@ unsigned int
 session_get_connect_count(const struct session_data *sd)
 {
     return (sd == NULL) ? 0 : sd->connect_count;
+}
+
+/******************************************************************************/
+const char *
+session_get_display(const struct session_data *sd)
+{
+    return (sd == NULL) ? "" : sd->display;
 }
 
 /******************************************************************************/
@@ -1157,10 +1350,10 @@ session_send_term(struct session_data *sd, int wait_for_all)
 /******************************************************************************/
 static void
 start_reconnect_script(const struct login_info *login_info,
-                       const struct session_parameters *s,
+                       const struct session_data *sd,
                        void *closure)
 {
-    env_set_user(login_info->uid, 0, s->display,
+    env_set_user(login_info->uid,
                  g_cfg->env_names,
                  g_cfg->env_values);
 
@@ -1182,14 +1375,14 @@ start_reconnect_script(const struct login_info *login_info,
         LOG_DEVEL_LEAKING_FDS("reconnect script", 3, -1);
 
         LOG(LOG_LEVEL_INFO,
-            "Starting session reconnection script on display %d: %s",
-            s->display, g_cfg->reconnect_sh);
+            "Starting session reconnection script on display %s: %s",
+            sd->display, g_cfg->reconnect_sh);
         g_execlp3(g_cfg->reconnect_sh, g_cfg->reconnect_sh, 0);
 
         /* should not get here */
         LOG(LOG_LEVEL_ERROR,
-            "Error starting session reconnection script on display %d: %s",
-            s->display, g_cfg->reconnect_sh);
+            "Error starting session reconnection script on display %s: %s",
+            sd->display, g_cfg->reconnect_sh);
     }
     else
     {
@@ -1206,7 +1399,7 @@ session_run_reconnect_script(const struct login_info *login_info,
                              const char *vars[])
 {
     if (fork_child(start_reconnect_script,
-                   login_info, &sd->params, sd->x_server, (void *)vars) < 0)
+                   login_info, sd, sd->x_server, (void *)vars) < 0)
     {
         LOG(LOG_LEVEL_ERROR, "Failed to fork for session reconnection script");
     }
@@ -1226,8 +1419,8 @@ session_get_display_server_fd(const struct login_info *login_info,
     if (sd->x_server <= 0)
     {
         LOG(LOG_LEVEL_ERROR,
-            "Request to connect to display server :%u"
-            " which has exited", sd->params.display);
+            "Request to connect to display server %s"
+            " which has exited", sd->display);
     }
     else
     {
@@ -1235,15 +1428,15 @@ session_get_display_server_fd(const struct login_info *login_info,
         {
             case SCP_SESSION_TYPE_XVNC:
                 socket_mode = TRANS_MODE_TCP;
-                snprintf(portname, sizeof(portname), "%u",
-                         5900 + sd->params.display);
+                snprintf(portname, sizeof(portname), "%d",
+                         5900 + sd->params.x11_display);
                 break;
 
             case SCP_SESSION_TYPE_XVNC_UDS:
             case SCP_SESSION_TYPE_XORG:
                 socket_mode = TRANS_MODE_UNIX;
                 snprintf(portname, sizeof(portname), XRDP_X11RDP_STR,
-                         login_info->uid, (int)sd->params.display);
+                         login_info->uid, sd->display);
 
                 break;
 
@@ -1263,8 +1456,8 @@ session_get_display_server_fd(const struct login_info *login_info,
             }
             else if (trans_connect(t, localhost, portname, 3000) != 0)
             {
-                LOG(LOG_LEVEL_ERROR, "Can't connect to display server :%u [%s]",
-                    sd->params.display,
+                LOG(LOG_LEVEL_ERROR, "Can't connect to display server %s [%s]",
+                    sd->display,
                     g_get_strerror());
             }
             else
@@ -1291,13 +1484,13 @@ session_get_chansrv_fd(const struct login_info *login_info,
     if (sd->chansrv <= 0)
     {
         LOG(LOG_LEVEL_ERROR,
-            "Request to connect to chansrv :%u"
-            " which has exited", sd->params.display);
+            "Request to connect to chansrv %s"
+            " which has exited", sd->display);
     }
     else
     {
         snprintf(portname, sizeof(portname),
-                 XRDP_CHANSRV_STR, login_info->uid, (int)sd->params.display);
+                 XRDP_CHANSRV_STR, login_info->uid, sd->display);
 
         // Use the transport library to get the fd
         struct trans *t = trans_create(TRANS_MODE_UNIX, 8192, 8192);
@@ -1307,8 +1500,8 @@ session_get_chansrv_fd(const struct login_info *login_info,
         }
         else if (trans_connect(t, NULL, portname, 10 * 1000) != 0)
         {
-            LOG(LOG_LEVEL_ERROR, "Can't connect to chansrv :%u [%s]",
-                sd->params.display,
+            LOG(LOG_LEVEL_ERROR, "Can't connect to chansrv %s [%s]",
+                sd->display,
                 g_get_strerror());
         }
         else

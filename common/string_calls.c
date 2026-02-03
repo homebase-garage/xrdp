@@ -162,8 +162,8 @@ g_text2bool(const char *s)
 }
 
 /*****************************************************************************/
-int
-g_get_display_num_from_display(const char *display_text)
+static int
+get_display_num_from_display(const char *display_text)
 {
     int rv = -1;
     const char *p;
@@ -186,6 +186,70 @@ g_get_display_num_from_display(const char *display_text)
         {
             rv = g_atoi(p);
         }
+    }
+
+    return rv;
+}
+
+/*****************************************************************************/
+int
+g_get_display_string_from_x11_display(int display_num,
+                                      char buff[], unsigned int bufflen)
+{
+    unsigned int res = g_snprintf(buff, bufflen, "X11-%d", display_num);
+    return (res >= bufflen) ? -1 : 0;
+}
+
+
+/*****************************************************************************/
+int
+g_get_x11_display_from_display_string(const char *display_str)
+{
+    int result = -1;
+    if (display_str != NULL)
+    {
+        if (display_str[0] == 'X' && display_str[1] == '1' &&
+                display_str[2] == '1' && display_str[3] == '-' &&
+                isdigit(display_str[4]))
+        {
+            result = g_atoi(display_str + 4);
+        }
+    }
+
+    return result;
+}
+
+/*****************************************************************************/
+int
+g_get_display_string(char buff[], unsigned int bufflen)
+{
+    const char *str;
+    const char *p = NULL;
+    int rv = 0;
+
+    if ((str = g_getenv("WAYLAND_DISPLAY")) != NULL)
+    {
+        // Return the unqualified part of the name
+        p = strrchr(str, '/');
+        p = (p != NULL) ? (p + 1) : str;
+        strlcpy(buff, p, bufflen);
+    }
+    else if ((str = g_getenv("DISPLAY")) != NULL)
+    {
+        int n = get_display_num_from_display(str);
+
+        if (n >= 0)
+        {
+            g_snprintf(buff, bufflen, "X11-%d", n);
+        }
+        else
+        {
+            rv = g_get_display_string_from_x11_display(n, buff, bufflen);
+        }
+    }
+    else
+    {
+        rv = -1;
     }
 
     return rv;

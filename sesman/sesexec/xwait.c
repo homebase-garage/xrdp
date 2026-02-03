@@ -117,8 +117,6 @@ wait_for_xserver(uid_t uid,
 
             /* Move to the user context... */
             env_set_user(uid,
-                         0,
-                         display,
                          env_names,
                          env_values);
 

@@ -311,9 +311,12 @@ password=ask
 #pampassword=asksame
 #delay_ms=2000
 ; Use one of these to connect to a chansrv instance created outside of sesman
-; (e.g. as part of an x11vnc console session). Replace 'n' with the
-; display number of the session, and (if applicable) 'u' with the numeric
+; (e.g. as part of an x11vnc console session). Replace 's' with the
+; display string of the session, and (if applicable) 'u' with the numeric
 ; UID of the session.
+;
+; For compatibility, a completely numeric display string is taken to be
+; an X11 display number
 ;
 ; You will also need to change the value of SessionSockdirGroup in
 ; sesman.ini to allow xrdp to reach the chansrv instance

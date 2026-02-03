@@ -520,7 +520,7 @@ static int
 handle_create_session_response(struct trans *t)
 {
     enum scp_screate_status status;
-    int display;
+    const char *display;
     struct guid guid;
 
     int rv = scp_sync_wait_specific(t, E_SCP_CREATE_SESSION_RESPONSE);
@@ -541,7 +541,7 @@ handle_create_session_response(struct trans *t)
             else
             {
                 char guid_str[GUID_STR_SIZE];
-                g_printf("ok display=:%d GUID=%s\n",
+                g_printf("ok display=%s GUID=%s\n",
                          display,
                          guid_to_str(&guid, guid_str));
             }

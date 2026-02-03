@@ -52,11 +52,12 @@
 #include "chansrv.h"
 #include "list.h"
 #include "smartcard_pcsc.h"
+#include "xrdp_sockets.h"
 
 #if PCSC_STANDIN
 
 
-extern int g_display_num; /* in chansrv.c */
+extern char g_display_str[]; /* in chansrv.c */
 
 static int g_autoinc = 0; /* general purpose autoinc */
 
@@ -1982,7 +1983,6 @@ int
 scard_pcsc_init(void)
 {
     char *home;
-    int disp;
     int error;
 
     LOG_DEVEL(LOG_LEVEL_DEBUG, "scard_pcsc_init:");
@@ -1992,8 +1992,8 @@ scard_pcsc_init(void)
         // TODO: See #2501. Use needs a way to move PCSCLITE_CSOCK_NAME
         // to a location not under $HOME.
         home = g_getenv("HOME");
-        disp = g_display_num;
-        g_snprintf(g_pcsclite_ipc_dir, 255, "%s/.pcsc%d", home, disp);
+        g_snprintf(g_pcsclite_ipc_dir, sizeof(g_pcsclite_ipc_dir),
+                   "%s/.pcsc%s", home, g_display_str);
 
         if (g_directory_exist(g_pcsclite_ipc_dir))
         {
@@ -2015,7 +2015,8 @@ scard_pcsc_init(void)
         /* Only the current user should be able to access the remote
          * smartcard */
         g_chmod_hex(g_pcsclite_ipc_dir, 0x700);
-        g_snprintf(g_pcsclite_ipc_file, 255, "%s/pcscd.comm", g_pcsclite_ipc_dir);
+        g_snprintf(g_pcsclite_ipc_file, sizeof(g_pcsclite_ipc_file),
+                   "%s/pcscd.comm", g_pcsclite_ipc_dir);
         g_lis->trans_conn_in = my_pcsc_trans_conn_in;
         error = trans_listen(g_lis, g_pcsclite_ipc_file);
         if (error != 0)

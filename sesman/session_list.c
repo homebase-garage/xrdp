@@ -160,7 +160,7 @@ session_list_new(void)
 
 /******************************************************************************/
 void
-session_list_get_session_displays(struct set_int *alloc_displays)
+session_list_get_session_x11_displays(struct set_int *alloc_displays)
 {
     int count = (g_session_list == NULL) ? 0 : g_session_list->count;
 
@@ -170,9 +170,13 @@ session_list_get_session_displays(struct set_int *alloc_displays)
         struct session_item *si;
         si = (struct session_item *)list_get_item(g_session_list, i);
 
-        if (SESSION_IN_USE(si))
+        if (SESSION_IN_USE(si) && SCP_SESSION_TYPE_IS_X11(si->type))
         {
-            set_int_add(alloc_displays, si->display);
+            int display = g_get_x11_display_from_display_string(si->display);
+            if (display >= 0)
+            {
+                set_int_add(alloc_displays, display);
+            }
         }
     }
 }
@@ -289,7 +293,7 @@ session_list_get_bydata(uid_t uid,
         }
 
         LOG(LOG_LEVEL_DEBUG,
-            "%s: Got match, display=%d", __func__, si->display);
+            "%s: Got match, display=%s", __func__, si->display);
         return si;
     }
 
@@ -351,7 +355,7 @@ session_list_get_byuid(const uid_t *uid, unsigned int *cnt, unsigned int flags)
         if (SESSION_IN_USE(si) && (uid == NULL || *uid == si->uid))
         {
             sess[index].sid = si->sesexec_pid;
-            sess[index].display = si->display;
+            sess[index].display = g_strdup(si->display);
             sess[index].type = si->type;
             sess[index].height = si->start_height;
             sess[index].width = si->start_width;
@@ -365,7 +369,8 @@ session_list_get_byuid(const uid_t *uid, unsigned int *cnt, unsigned int flags)
             sess[index].xrdp_instance_name = g_strdup(si->xrdp_instance_name);
 
             /* Check for string allocation failures */
-            if (sess[index].start_ip_addr == NULL ||
+            if (sess[index].display == NULL ||
+                    sess[index].start_ip_addr == NULL ||
                     sess[index].client_ip == NULL ||
                     sess[index].client_name == NULL ||
                     sess[index].xrdp_instance_name == NULL)
@@ -410,6 +415,7 @@ free_session_info_list(struct scp_session_info *sesslist, unsigned int cnt)
         unsigned int i;
         for (i = 0 ; i < cnt ; ++i)
         {
+            g_free(sesslist[i].display);
             g_free(sesslist[i].start_ip_addr);
             g_free(sesslist[i].client_ip);
             g_free(sesslist[i].client_name);

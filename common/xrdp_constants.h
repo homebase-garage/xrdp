@@ -50,6 +50,12 @@
 #define MAX_XRDP_INSTANCE_NAMELEN 80
 
 /**
+ * Max length of buffer containing a Wayland or X11 display
+ * name
+ **/
+#define MAX_DISPLAY_NAME_SIZE 32
+
+/**
  * Size of buffer including terminator for a socket description, as
  * returned by g_sck_get_peer_description()
  * Currently the largest is an IPv6 address (INET6_ADDRSTRLEN), plus
