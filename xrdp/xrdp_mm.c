@@ -1317,9 +1317,10 @@ xrdp_mm_update_module_frame_ack(struct xrdp_mm *self)
     {
         // Can't pass the ack to the encoder. Tell the module all
         // frames are ACK'd
-        if (self->mod != NULL)
+        struct xrdp_mod *m = self->mod;
+        if (m != NULL)
         {
-            self->mod->mod_frame_ack(self->mod, 0, INT_MAX);
+            m->mod_frame_ack(m, 0, INT_MAX);
         }
     }
     else
@@ -1332,10 +1333,11 @@ xrdp_mm_update_module_frame_ack(struct xrdp_mm *self)
                 LOG_DEVEL(LOG_LEVEL_DEBUG, "xrdp_mm_update_module_ack: "
                           "frame_id_server %d", encoder->frame_id_server);
                 encoder->frame_id_server_sent = encoder->frame_id_server;
-                if (self->mod != NULL)
+                struct xrdp_mod *m = self->mod;
+                if (m != NULL)
                 {
-                    self->mod->mod_frame_ack(self->mod, 0,
-                                             encoder->frame_id_server);
+                    m->mod_frame_ack(m, 0,
+                                     encoder->frame_id_server);
                 }
             }
         }
@@ -5528,9 +5530,12 @@ xrdp_mm_setup_mod2(struct xrdp_mm *self)
                 int key_flags = self->last_sync_key_flags;
                 int device_flags = self->last_sync_device_flags;
                 self->last_sync_saved = 0;
-                self->mod->mod_event(self->mod, WM_KEYBRD_SYNC, key_flags,
-                                     device_flags, key_flags, device_flags);
-
+                struct xrdp_mod *m = self->mod;
+                if (m != 0 && m->mod_event != 0)
+                {
+                    m->mod_event(m, WM_KEYBRD_SYNC, key_flags,
+                                 device_flags, key_flags, device_flags);
+                }
             }
         }
         else
@@ -5566,10 +5571,11 @@ xrdp_mm_setup_mod2(struct xrdp_mm *self)
 
         if (self->mod != 0)
         {
-            if (self->mod->mod_event != 0)
+            struct xrdp_mod *m = self->mod;
+            if (m != 0 && m->mod_event != 0)
             {
-                self->mod->mod_event(self->mod, WM_KEYBRD_SYNC, key_flags,
-                                     device_flags, key_flags, device_flags);
+                m->mod_event(m, WM_KEYBRD_SYNC, key_flags,
+                             device_flags, key_flags, device_flags);
             }
         }
     }
