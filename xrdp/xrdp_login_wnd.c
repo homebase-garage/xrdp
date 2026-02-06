@@ -60,9 +60,10 @@ xrdp_wm_login_help_notify(struct xrdp_bitmap *wnd,
     {
         if (sender->id == 1) /* ok button */
         {
-            if (sender->owner->notify != 0)
+            struct xrdp_bitmap *o = wnd->owner;
+            if (o != 0 && o->notify != 0)
             {
-                wnd->owner->notify(wnd->owner, wnd, 100, 1, 0); /* ok */
+                o->notify(o, wnd, 100, 1, 0); /* ok */
             }
         }
     }

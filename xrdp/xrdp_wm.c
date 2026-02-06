@@ -1201,12 +1201,9 @@ xrdp_wm_mouse_move(struct xrdp_wm *self, int x, int y)
             self->current_pointer = self->screen->pointer;
         }
 
-        if (self->mm->mod != 0) /* if screen is mod controlled */
+        if (self->mm != 0 && self->mm->mod != 0 && self->mm->mod->mod_event != 0)
         {
-            if (self->mm->mod->mod_event != 0)
-            {
-                self->mm->mod->mod_event(self->mm->mod, WM_MOUSEMOVE, x, y, 0, 0);
-            }
+            self->mm->mod->mod_event(self->mm->mod, WM_MOUSEMOVE, x, y, 0, 0);
         }
     }
 
@@ -1242,7 +1239,11 @@ xrdp_wm_mouse_move(struct xrdp_wm *self, int x, int y)
             {
                 if (b->notify != 0)
                 {
-                    b->notify(b->owner, b, 2, x, y);
+                    struct xrdp_bitmap *o = b->owner;
+                    if (o != 0)
+                    {
+                        b->notify(o, b, 2, x, y);
+                    }
                 }
             }
         }
@@ -1364,92 +1365,89 @@ xrdp_wm_mouse_click(struct xrdp_wm *self, int x, int y, int but, int down)
 
     if (control == 0)
     {
-        if (self->mm->mod != 0) /* if screen is mod controlled */
+        if (self->mm != 0 && self->mm->mod != 0 && self->mm->mod->mod_event != 0)
         {
-            if (self->mm->mod->mod_event != 0)
+            if (down)
             {
-                if (down)
-                {
-                    self->mm->mod->mod_event(self->mm->mod, WM_MOUSEMOVE, x, y, 0, 0);
-                }
-                if (but == 1 && down)
-                {
-                    self->mm->mod->mod_event(self->mm->mod, WM_LBUTTONDOWN, x, y, 0, 0);
-                }
-                else if (but == 1 && !down)
-                {
-                    self->mm->mod->mod_event(self->mm->mod, WM_LBUTTONUP, x, y, 0, 0);
-                }
+                self->mm->mod->mod_event(self->mm->mod, WM_MOUSEMOVE, x, y, 0, 0);
+            }
+            if (but == 1 && down)
+            {
+                self->mm->mod->mod_event(self->mm->mod, WM_LBUTTONDOWN, x, y, 0, 0);
+            }
+            else if (but == 1 && !down)
+            {
+                self->mm->mod->mod_event(self->mm->mod, WM_LBUTTONUP, x, y, 0, 0);
+            }
 
-                if (but == 2 && down)
-                {
-                    self->mm->mod->mod_event(self->mm->mod, WM_RBUTTONDOWN, x, y, 0, 0);
-                }
-                else if (but == 2 && !down)
-                {
-                    self->mm->mod->mod_event(self->mm->mod, WM_RBUTTONUP, x, y, 0, 0);
-                }
+            if (but == 2 && down)
+            {
+                self->mm->mod->mod_event(self->mm->mod, WM_RBUTTONDOWN, x, y, 0, 0);
+            }
+            else if (but == 2 && !down)
+            {
+                self->mm->mod->mod_event(self->mm->mod, WM_RBUTTONUP, x, y, 0, 0);
+            }
 
-                if (but == 3 && down)
-                {
-                    self->mm->mod->mod_event(self->mm->mod, WM_BUTTON3DOWN, x, y, 0, 0);
-                }
-                else if (but == 3 && !down)
-                {
-                    self->mm->mod->mod_event(self->mm->mod, WM_BUTTON3UP, x, y, 0, 0);
-                }
+            if (but == 3 && down)
+            {
+                self->mm->mod->mod_event(self->mm->mod, WM_BUTTON3DOWN, x, y, 0, 0);
+            }
+            else if (but == 3 && !down)
+            {
+                self->mm->mod->mod_event(self->mm->mod, WM_BUTTON3UP, x, y, 0, 0);
+            }
 
-                if (but == 8 && down)
-                {
-                    self->mm->mod->mod_event(self->mm->mod, WM_BUTTON8DOWN, x, y, 0, 0);
-                }
-                else if (but == 8 && !down)
-                {
-                    self->mm->mod->mod_event(self->mm->mod, WM_BUTTON8UP, x, y, 0, 0);
-                }
-                if (but == 9 && down)
-                {
-                    self->mm->mod->mod_event(self->mm->mod, WM_BUTTON9DOWN, x, y, 0, 0);
-                }
-                else if (but == 9 && !down)
-                {
-                    self->mm->mod->mod_event(self->mm->mod, WM_BUTTON9UP, x, y, 0, 0);
-                }
-                /* vertical scroll */
+            if (but == 8 && down)
+            {
+                self->mm->mod->mod_event(self->mm->mod, WM_BUTTON8DOWN, x, y, 0, 0);
+            }
+            else if (but == 8 && !down)
+            {
+                self->mm->mod->mod_event(self->mm->mod, WM_BUTTON8UP, x, y, 0, 0);
+            }
+            if (but == 9 && down)
+            {
+                self->mm->mod->mod_event(self->mm->mod, WM_BUTTON9DOWN, x, y, 0, 0);
+            }
+            else if (but == 9 && !down)
+            {
+                self->mm->mod->mod_event(self->mm->mod, WM_BUTTON9UP, x, y, 0, 0);
+            }
+            /* vertical scroll */
 
-                if (but == 4)
-                {
-                    self->mm->mod->mod_event(self->mm->mod, WM_BUTTON4DOWN,
-                                             self->mouse_x, self->mouse_y, 0, 0);
-                    self->mm->mod->mod_event(self->mm->mod, WM_BUTTON4UP,
-                                             self->mouse_x, self->mouse_y, 0, 0);
-                }
+            if (but == 4)
+            {
+                self->mm->mod->mod_event(self->mm->mod, WM_BUTTON4DOWN,
+                                         self->mouse_x, self->mouse_y, 0, 0);
+                self->mm->mod->mod_event(self->mm->mod, WM_BUTTON4UP,
+                                         self->mouse_x, self->mouse_y, 0, 0);
+            }
 
-                if (but == 5)
-                {
-                    self->mm->mod->mod_event(self->mm->mod, WM_BUTTON5DOWN,
-                                             self->mouse_x, self->mouse_y, 0, 0);
-                    self->mm->mod->mod_event(self->mm->mod, WM_BUTTON5UP,
-                                             self->mouse_x, self->mouse_y, 0, 0);
-                }
+            if (but == 5)
+            {
+                self->mm->mod->mod_event(self->mm->mod, WM_BUTTON5DOWN,
+                                         self->mouse_x, self->mouse_y, 0, 0);
+                self->mm->mod->mod_event(self->mm->mod, WM_BUTTON5UP,
+                                         self->mouse_x, self->mouse_y, 0, 0);
+            }
 
-                /* horizontal scroll */
+            /* horizontal scroll */
 
-                if (but == 6)
-                {
-                    self->mm->mod->mod_event(self->mm->mod, WM_BUTTON6DOWN,
-                                             self->mouse_x, self->mouse_y, 0, 0);
-                    self->mm->mod->mod_event(self->mm->mod, WM_BUTTON6UP,
-                                             self->mouse_x, self->mouse_y, 0, 0);
-                }
+            if (but == 6)
+            {
+                self->mm->mod->mod_event(self->mm->mod, WM_BUTTON6DOWN,
+                                         self->mouse_x, self->mouse_y, 0, 0);
+                self->mm->mod->mod_event(self->mm->mod, WM_BUTTON6UP,
+                                         self->mouse_x, self->mouse_y, 0, 0);
+            }
 
-                if (but == 7)
-                {
-                    self->mm->mod->mod_event(self->mm->mod, WM_BUTTON7DOWN,
-                                             self->mouse_x, self->mouse_y, 0, 0);
-                    self->mm->mod->mod_event(self->mm->mod, WM_BUTTON7UP,
-                                             self->mouse_x, self->mouse_y, 0, 0);
-                }
+            if (but == 7)
+            {
+                self->mm->mod->mod_event(self->mm->mod, WM_BUTTON7DOWN,
+                                         self->mouse_x, self->mouse_y, 0, 0);
+                self->mm->mod->mod_event(self->mm->mod, WM_BUTTON7UP,
+                                         self->mouse_x, self->mouse_y, 0, 0);
             }
         }
     }
@@ -1628,23 +1626,19 @@ xrdp_wm_key(struct xrdp_wm *self, int keyboard_flags, int key_code)
         }
     }
 
-    if (self->mm->mod != 0)
+    if (self->mm->mod != 0 && self->mm->mod->mod_event != 0)
     {
-        // Backend module loaded...
-        if (self->mm->mod->mod_event != 0)
-        {
-            // ..and able to take events. Check the scancode maps to
-            // a real key in the currently loaded keymap
-            ki = get_key_info_from_kbd_event
-                 (keyboard_flags, key_code, self->keys, self->caps_lock,
-                  self->num_lock, self->scroll_lock,
-                  &(self->keymap));
+        // ..and able to take events. Check the scancode maps to
+        // a real key in the currently loaded keymap
+        ki = get_key_info_from_kbd_event
+             (keyboard_flags, key_code, self->keys, self->caps_lock,
+              self->num_lock, self->scroll_lock,
+              &(self->keymap));
 
-            if (ki != 0)
-            {
-                self->mm->mod->mod_event(self->mm->mod, msg, ki->chr, ki->sym,
-                                         key_code, keyboard_flags);
-            }
+        if (ki != 0)
+        {
+            self->mm->mod->mod_event(self->mm->mod, msg, ki->chr, ki->sym,
+                                     key_code, keyboard_flags);
         }
     }
     else if (self->focused_window != 0)
@@ -2088,7 +2082,7 @@ xrdp_wm_process_channel_data(struct xrdp_wm *self,
         }
         else
         {
-            if (self->mm->mod->mod_event != 0)
+            if (self->mm->mod != 0 && self->mm->mod->mod_event != 0)
             {
                 rv = self->mm->mod->mod_event(self->mm->mod, WM_CHANNEL_DATA,
                                               param1, param2, param3, param4);

@@ -195,17 +195,17 @@ xrdp_bitmap_delete(struct xrdp_bitmap *self)
 
     if (self->wm != 0)
     {
-        if (self->wm->focused_window != 0)
-        {
-            if (self->wm->focused_window->focused_control == self)
-            {
-                self->wm->focused_window->focused_control = 0;
-            }
-        }
-
         if (self->wm->focused_window == self)
         {
             self->wm->focused_window = 0;
+        }
+
+        if (self->wm->popup_wnd != 0)
+        {
+            if (self->wm->popup_wnd == self || self->wm->popup_wnd->popped_from == self)
+            {
+                self->wm->popup_wnd = 0;
+            }
         }
 
         if (self->wm->dragging_window == self)
@@ -216,11 +216,6 @@ xrdp_bitmap_delete(struct xrdp_bitmap *self)
         if (self->wm->button_down == self)
         {
             self->wm->button_down = 0;
-        }
-
-        if (self->wm->popup_wnd == self)
-        {
-            self->wm->popup_wnd = 0;
         }
 
         if (self->wm->login_window == self)

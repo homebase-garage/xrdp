@@ -708,34 +708,42 @@ xrdp_bitmap_invalidate(struct xrdp_bitmap *self, struct xrdp_rect *rect)
     }
     else if (self->type == WND_TYPE_SCREEN) /* 2 */
     {
-        if (self->wm->mm->mod != 0)
+        struct xrdp_wm *wm = self->wm;
+        if (wm == 0)
         {
-            if (self->wm->mm->mod->mod_event != 0)
+            return 0;
+        }
+        struct xrdp_mm *mm = wm->mm;
+        if (mm == 0)
+        {
+            return 0;
+        }
+        struct xrdp_mod *m = mm->mod;
+        if (m != 0 && m->mod_event != 0)
+        {
+            if (rect != 0)
             {
-                if (rect != 0)
-                {
-                    x = rect->left;
-                    y = rect->top;
-                    w = rect->right - rect->left;
-                    h = rect->bottom - rect->top;
+                x = rect->left;
+                y = rect->top;
+                w = rect->right - rect->left;
+                h = rect->bottom - rect->top;
 
-                    if (check_bounds(self->wm->screen, &x, &y, &w, &h))
-                    {
-                        self->wm->mm->mod->mod_event(self->wm->mm->mod, WM_INVALIDATE,
-                                                     MAKELONG(y, x), MAKELONG(h, w),
-                                                     0, 0);
-                    }
-                }
-                else
+                if (check_bounds(self->wm->screen, &x, &y, &w, &h))
                 {
-                    x = 0;
-                    y = 0;
-                    w = self->wm->screen->width;
-                    h = self->wm->screen->height;
-                    self->wm->mm->mod->mod_event(self->wm->mm->mod, WM_INVALIDATE,
-                                                 MAKELONG(y, x), MAKELONG(h, w),
-                                                 0, 0);
+                    m->mod_event(m, WM_INVALIDATE,
+                                 MAKELONG(y, x), MAKELONG(h, w),
+                                 0, 0);
                 }
+            }
+            else
+            {
+                x = 0;
+                y = 0;
+                w = self->wm->screen->width;
+                h = self->wm->screen->height;
+                m->mod_event(m, WM_INVALIDATE,
+                             MAKELONG(y, x), MAKELONG(h, w),
+                             0, 0);
             }
         }
         else
@@ -1144,7 +1152,11 @@ xrdp_bitmap_def_proc(struct xrdp_bitmap *self, int msg,
 
         if (self->focused_control != 0)
         {
-            xrdp_bitmap_def_proc(self->focused_control, msg, param1, param2);
+            struct xrdp_bitmap *fc = self->focused_control;
+            if (fc != 0 && fc->wm != 0)
+            {
+                xrdp_bitmap_def_proc(fc, msg, param1, param2);
+            }
         }
     }
     else if (self->type == WND_TYPE_EDIT)
@@ -1270,9 +1282,10 @@ xrdp_bitmap_def_proc(struct xrdp_bitmap *self, int msg,
                     self->item_index--;
                     xrdp_bitmap_invalidate(self, 0);
 
-                    if (self->parent->notify != 0)
+                    struct xrdp_bitmap *p = self->parent;
+                    if (p != 0 && p->notify != 0)
                     {
-                        self->parent->notify(self->parent, self, CB_ITEMCHANGE, 0, 0);
+                        p->notify(p, self, CB_ITEMCHANGE, 0, 0);
                     }
                 }
             }
@@ -1287,9 +1300,10 @@ xrdp_bitmap_def_proc(struct xrdp_bitmap *self, int msg,
                     self->item_index++;
                     xrdp_bitmap_invalidate(self, 0);
 
-                    if (self->parent->notify != 0)
+                    struct xrdp_bitmap *p = self->parent;
+                    if (p != 0 && p->notify != 0)
                     {
-                        self->parent->notify(self->parent, self, CB_ITEMCHANGE, 0, 0);
+                        p->notify(p, self, CB_ITEMCHANGE, 0, 0);
                     }
                 }
             }
@@ -1314,16 +1328,16 @@ xrdp_bitmap_def_proc(struct xrdp_bitmap *self, int msg,
         }
         else if (msg == WM_LBUTTONUP)
         {
-            if (self->popped_from != 0)
+            struct xrdp_bitmap *pf = self->popped_from;
+            if (pf != 0)
             {
-                self->popped_from->item_index = self->item_index;
-                xrdp_bitmap_invalidate(self->popped_from, 0);
+                pf->item_index = self->item_index;
+                xrdp_bitmap_invalidate(pf, 0);
 
-                if (self->popped_from->parent->notify != 0)
+                struct xrdp_bitmap *p = pf->parent;
+                if (p != 0 && p->notify != 0)
                 {
-                    self->popped_from->parent->notify(self->popped_from->parent,
-                                                      self->popped_from,
-                                                      CB_ITEMCHANGE, 0, 0);
+                    p->notify(p, pf, CB_ITEMCHANGE, 0, 0);
                 }
             }
         }
