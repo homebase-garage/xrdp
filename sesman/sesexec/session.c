@@ -394,6 +394,12 @@ prepare_xorg_xserver_params(const struct session_data *sd,
         g_snprintf(text, sizeof(text), "%d", g_cfg->sess.kill_disconnected);
         g_setenv_log("XRDP_SESMAN_KILL_DISCONNECTED", text, 1);
 
+        g_snprintf(text, sizeof(text), XRDP_X11RDP_BASE_STR, sd->display);
+        g_setenv_log("XRDP_X11RDP_SOCKET", text, 1);
+
+        g_snprintf(text, sizeof(text), XRDP_DISCONNECT_BASE_STR, sd->display);
+        g_setenv_log("XRDP_DISCONNECT_SOCKET", text, 1);
+
         /* get path of Xorg from config */
         xserver = (const char *)list_get_item(g_cfg->xorg_params, 0);
 
