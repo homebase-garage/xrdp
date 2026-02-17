@@ -375,9 +375,10 @@ xrdp_encoder_create(struct xrdp_mm *mm)
 void
 xrdp_encoder_delete(struct xrdp_encoder *self)
 {
+#if defined(XRDP_RFXCODEC) || defined(XRDP_X264) || defined(XRDP_OPENH264)
     int index;
+#endif
 
-    (void)index;
 
     LOG_DEVEL(LOG_LEVEL_INFO, "xrdp_encoder_delete:");
     if (self == 0)
