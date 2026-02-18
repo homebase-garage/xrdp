@@ -4403,7 +4403,10 @@ server_paint_rects_ex(struct xrdp_mod *mod,
     if (wm->client_info->gfx)
     {
         LOG(LOG_LEVEL_DEBUG, "server_paint_rects: gfx session and no encoder");
-        mm->mod->mod_frame_ack(mm->mod, flags, frame_id);
+        if (mod->mod_frame_ack != 0)
+        {
+            mod->mod_frame_ack(mod, flags, frame_id);
+        }
         return 0;
     }
 
@@ -4422,7 +4425,10 @@ server_paint_rects_ex(struct xrdp_mod *mod,
         s += 4;
     }
     xrdp_bitmap_delete(b);
-    mm->mod->mod_frame_ack(mm->mod, flags, frame_id);
+    if (mod->mod_frame_ack != 0)
+    {
+        mod->mod_frame_ack(mod, flags, frame_id);
+    }
     if (shmem_ptr != NULL)
     {
         g_munmap(shmem_ptr, shmem_bytes);
@@ -5436,15 +5442,21 @@ xrdp_mm_setup_mod2(struct xrdp_mm *self)
     int rv;
     int key_flags;
     int device_flags;
+    struct xrdp_mod *mod = self->mod;
+
+    if (mod == 0)
+    {
+        return 1;
+    }
 
     rv = 1; /* failure */
     g_memset(text, 0, sizeof(text));
 
     if (!g_is_wait_obj_set(self->wm->pro_layer->self_term_event))
     {
-        if (self->mod->mod_start(self->mod, self->wm->screen->width,
-                                 self->wm->screen->height,
-                                 self->wm->screen->bpp) != 0)
+        if (mod->mod_start(mod, self->wm->screen->width,
+                           self->wm->screen->height,
+                           self->wm->screen->bpp) != 0)
         {
             xrdp_mm_set_fatal(self, ERRINFO_SERVER_DWM_CRASH);
         }
@@ -5492,30 +5504,30 @@ xrdp_mm_setup_mod2(struct xrdp_mm *self)
 
         /* always set these */
 
-        self->mod->mod_set_param(self->mod, "client_info",
-                                 (const char *) (self->wm->session->client_info));
+        mod->mod_set_param(mod, "client_info",
+                           (const char *) (self->wm->session->client_info));
 
         name = self->wm->session->client_info->client_name;
-        self->mod->mod_set_param(self->mod, "client_name", name);
+        mod->mod_set_param(mod, "client_name", name);
         g_snprintf(text, 255, "%d", self->wm->session->client_info->keylayout);
-        self->mod->mod_set_param(self->mod, "keylayout", text);
+        mod->mod_set_param(mod, "keylayout", text);
         if (guid_is_set(&self->guid))
         {
-            self->mod->mod_set_param(self->mod, "guid", (char *) &self->guid);
+            mod->mod_set_param(mod, "guid", (char *) &self->guid);
         }
 
         for (i = 0; i < self->login_names->count; i++)
         {
             name = (const char *) list_get_item(self->login_names, i);
             value = (const char *) list_get_item(self->login_values, i);
-            self->mod->mod_set_param(self->mod, name, value);
+            mod->mod_set_param(mod, name, value);
         }
 
         /* connect
         *
          * If we got an fd for the display server from sesman, this
          * call will use it */
-        if (self->mod->mod_connect(self->mod, self->sesman_display_fd) == 0)
+        if (mod->mod_connect(mod, self->sesman_display_fd) == 0)
         {
             rv = 0; /* connect success */
 
@@ -5530,11 +5542,10 @@ xrdp_mm_setup_mod2(struct xrdp_mm *self)
                 int key_flags = self->last_sync_key_flags;
                 int device_flags = self->last_sync_device_flags;
                 self->last_sync_saved = 0;
-                struct xrdp_mod *m = self->mod;
-                if (m != 0 && m->mod_event != 0)
+                if (mod->mod_event != 0)
                 {
-                    m->mod_event(m, WM_KEYBRD_SYNC, key_flags,
-                                 device_flags, key_flags, device_flags);
+                    mod->mod_event(mod, WM_KEYBRD_SYNC, key_flags,
+                                   device_flags, key_flags, device_flags);
                 }
             }
         }
@@ -5569,14 +5580,10 @@ xrdp_mm_setup_mod2(struct xrdp_mm *self)
             key_flags |= 4;
         }
 
-        if (self->mod != 0)
+        if (mod->mod_event != 0)
         {
-            struct xrdp_mod *m = self->mod;
-            if (m != 0 && m->mod_event != 0)
-            {
-                m->mod_event(m, WM_KEYBRD_SYNC, key_flags,
-                             device_flags, key_flags, device_flags);
-            }
+            mod->mod_event(mod, WM_KEYBRD_SYNC, key_flags,
+                           device_flags, key_flags, device_flags);
         }
     }
 
