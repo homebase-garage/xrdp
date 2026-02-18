@@ -5444,7 +5444,7 @@ xrdp_mm_setup_mod2(struct xrdp_mm *self)
     int device_flags;
     struct xrdp_mod *mod = self->mod;
 
-    if (self->mod == 0)
+    if (mod == 0)
     {
         return 1;
     }
