@@ -152,32 +152,33 @@ sesman_process_params(int argc, char **argv,
             value = "";
         }
 
-        if (nocase_matches(option, "-help", "--help", "-h", NULL))
+        if (nocase_matches(option, "-help", "--help", "-h", (const char *)0))
         {
             startup_params->help = 1;
         }
-        else if (nocase_matches(option, "-kill", "--kill", "-k", NULL))
+        else if (nocase_matches(option, "-kill", "--kill", "-k",
+                                (const char *)0))
         {
             startup_params->mode = SSM_KILL_DAEMON;
         }
-        else if (nocase_matches(option, "-reload", "--reload", "-r", NULL))
+        else if (nocase_matches(option, "-reload", "--reload", "-r", (const char *)0))
         {
             startup_params->mode = SSM_RELOAD_DAEMON;
         }
         else if (nocase_matches(option, "-nodaemon", "--nodaemon", "-n",
-                                "-nd", "--nd", "-ns", "--ns", NULL))
+                                "-nd", "--nd", "-ns", "--ns", (const char *)0))
         {
             startup_params->no_daemon = 1;
         }
-        else if (nocase_matches(option, "-v", "--version", NULL))
+        else if (nocase_matches(option, "-v", "--version", (const char *)0))
         {
             startup_params->version = 1;
         }
-        else if (nocase_matches(option, "--dump-config", NULL))
+        else if (nocase_matches(option, "--dump-config", (const char *)0))
         {
             startup_params->dump_config = 1;
         }
-        else if (nocase_matches(option, "-c", "--config", NULL))
+        else if (nocase_matches(option, "-c", "--config", (const char *)0))
         {
             index++;
             startup_params->sesman_ini = value;

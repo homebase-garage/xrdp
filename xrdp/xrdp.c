@@ -177,24 +177,25 @@ xrdp_process_params(int argc, char **argv,
             value = "";
         }
 
-        if (nocase_matches(option, "-help", "--help", "-h", NULL))
+        if (nocase_matches(option, "-help", "--help", "-h", (const char *)0))
         {
             startup_params->help = 1;
         }
-        else if (nocase_matches(option, "-kill", "--kill", "-k", NULL))
+        else if (nocase_matches(option, "-kill", "--kill", "-k",
+                                (const char *)0))
         {
             startup_params->kill = 1;
         }
         else if (nocase_matches(option, "-nodaemon", "--nodaemon", "-n",
-                                "-nd", "--nd", "-ns", "--ns", NULL))
+                                "-nd", "--nd", "-ns", "--ns", (const char *)0))
         {
             startup_params->no_daemon = 1;
         }
-        else if (nocase_matches(option, "-v", "--version", NULL))
+        else if (nocase_matches(option, "-v", "--version", (const char *)0))
         {
             startup_params->version = 1;
         }
-        else if (nocase_matches(option, "-p", "--port", NULL))
+        else if (nocase_matches(option, "-p", "--port", (const char *)0))
         {
             index++;
             g_strncpy(startup_params->port, value,
@@ -211,20 +212,20 @@ xrdp_process_params(int argc, char **argv,
                           startup_params->port);
             }
         }
-        else if (nocase_matches(option, "-f", "--fork", NULL))
+        else if (nocase_matches(option, "-f", "--fork", (const char *)0))
         {
             startup_params->fork = 1;
             g_writeln("--fork parameter found, ini override");
         }
-        else if (nocase_matches(option, "--dump-config", NULL))
+        else if (nocase_matches(option, "--dump-config", (const char *)0))
         {
             startup_params->dump_config = 1;
         }
-        else if (nocase_matches(option, "--license", NULL))
+        else if (nocase_matches(option, "--license", (const char *)0))
         {
             startup_params->license = 1;
         }
-        else if (nocase_matches(option, "-c", "--config", NULL))
+        else if (nocase_matches(option, "-c", "--config", (const char *)0))
         {
             index++;
             startup_params->xrdp_ini = value;

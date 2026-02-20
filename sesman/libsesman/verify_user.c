@@ -45,8 +45,8 @@
 #define SECS_PER_DAY (24L*3600L)
 #endif
 
-static int
-auth_crypt_pwd(const char *pwd, const char *pln, char *crp);
+static char *
+auth_crypt_pwd(const char *pwd, const char *pln);
 
 static int
 auth_account_disabled(struct spwd *stp);
@@ -257,7 +257,7 @@ auth_change_pwd(const char *user, const char *newpwd)
 {
     struct passwd *spw;
     struct spwd *stp;
-    char hash[35] = "";
+    char *newpw;
     long today;
 
     FILE *fd;
@@ -278,13 +278,13 @@ auth_change_pwd(const char *user, const char *newpwd)
     if (g_strncmp(spw->pw_passwd, "x", 3) != 0)
     {
         /* old system with only passwd */
-        if (auth_crypt_pwd(spw->pw_passwd, newpwd, hash) != 0)
+        if ((newpw = auth_crypt_pwd(spw->pw_passwd, newpwd)) == NULL)
         {
             ulckpwdf();
             return 1;
         }
 
-        spw->pw_passwd = g_strdup(hash);
+        spw->pw_passwd = newpw;
         fd = fopen("/etc/passwd", "rw");
         putpwent(spw, fd);
     }
@@ -299,13 +299,13 @@ auth_change_pwd(const char *user, const char *newpwd)
         }
 
         /* old system with only passwd */
-        if (auth_crypt_pwd(stp->sp_pwdp, newpwd, hash) != 0)
+        if ((newpw = auth_crypt_pwd(stp->sp_pwdp, newpwd)) == NULL)
         {
             ulckpwdf();
             return 1;
         }
 
-        stp->sp_pwdp = g_strdup(hash);
+        stp->sp_pwdp = newpw;
         today = time(NULL) / SECS_PER_DAY;
         stp->sp_lstchg = today;
         stp->sp_expire = today + stp->sp_max + stp->sp_inact;
@@ -322,43 +322,21 @@ auth_change_pwd(const char *user, const char *newpwd)
  * @brief Password encryption
  * @param pwd Old password
  * @param pln Plaintext new password
- * @param crp Crypted new password
- *
+ * @return Dynamically allocated new password
  */
 
-static int
-auth_crypt_pwd(const char *pwd, const char *pln, char *crp)
+static char *
+auth_crypt_pwd(const char *pwd, const char *pln)
 {
-    char salt[13] = "$1$";
-    int saltcnt = 0;
-    char *encr;
+    char random[32];
 
-    if (g_strncmp(pwd, "$1$", 3) == 0)
-    {
-        /* gnu style crypt(); */
-        saltcnt = 3;
+    g_random(random, sizeof(random));
 
-        while ((pwd[saltcnt] != '$') && (saltcnt < 11))
-        {
-            salt[saltcnt] = pwd[saltcnt];
-            saltcnt++;
-        }
-
-        salt[saltcnt] = '$';
-        salt[saltcnt + 1] = '\0';
-    }
-    else
-    {
-        /* classic two char salt */
-        salt[0] = pwd[0];
-        salt[1] = pwd[1];
-        salt[2] = '\0';
-    }
-
-    encr = crypt(pln, salt);
-    g_strncpy(crp, encr, 34);
-
-    return 0;
+    // crypt_gensalt() is not defined by POSIX, but we have to change
+    // the salt when the password is changed.
+    const char *encr = crypt(pln,
+                             crypt_gensalt(pwd, 0, random, sizeof(random)));
+    return g_strdup(encr);
 }
 
 /**

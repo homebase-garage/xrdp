@@ -84,7 +84,7 @@ fi
 # Supply default flags passed to cppcheck if necessary
 if [ -z "$CPPCHECK_FLAGS" ]; then
     CPPCHECK_FLAGS="--quiet --force --std=c11 --std=c++11 --inline-suppr \
-                    --enable=warning,missingInclude,style --disable=portability --disable=performance --error-exitcode=1 \
+                    --enable=warning,missingInclude,style,portability --disable=performance --error-exitcode=1 \
                     -i third_party \
                     -i vrplayer \
                     --suppress=constParameterCallback --suppress=variableScope --suppress=constParameterPointer --suppress=constVariablePointer --suppress=duplicateCondition --suppress=redundantAssignment --suppress=knownConditionTrueFalse --suppress=unreadVariable --suppress=constParameter --suppress=constVariable --suppress=shadowFunction --suppress=unusedStructMember --suppress=duplicateExpression --suppress=unsignedLessThanZero --suppress=shadowVariable --suppress=unreachableCode --suppress=noExplicitConstructor --suppress=constParameterReference --suppress=functionStatic --suppress=shadowArgument --suppress=truncLongCastAssignment --suppress=cstyleCast --suppress=constVariableReference --suppress=badBitmaskCheck \

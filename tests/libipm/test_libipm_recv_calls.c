@@ -742,8 +742,8 @@ START_TEST(test_libipm_receive_unsupported_type)
     *g_t_in->in_s->p = 'A'; /* unsupported type */
     c = libipm_msg_in_peek_type(g_t_in);
     ck_assert_int_eq(c, '?'); /* peek should say this is an error */
-
-    status = libipm_msg_in_parse( g_t_in, "A", NULL); /* Parse it anyway */
+    /* Parse it anyway */
+    status = libipm_msg_in_parse( g_t_in, "A", (const char *)0);
     ck_assert_int_eq(status, E_LI_UNSUPPORTED_TYPE);
 }
 END_TEST
@@ -783,7 +783,7 @@ START_TEST(test_libipm_receive_unimplemented_type)
     *g_t_in->in_s->p = 'd'; /* reserved type */
     c = libipm_msg_in_peek_type(g_t_in);
     ck_assert_int_eq(c, 'd');
-    status = libipm_msg_in_parse( g_t_in, "d", NULL);
+    status = libipm_msg_in_parse( g_t_in, "d", (const char *)0);
     ck_assert_int_eq(status, E_LI_UNIMPLEMENTED_TYPE);
 }
 END_TEST

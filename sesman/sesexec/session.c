@@ -399,7 +399,7 @@ prepare_xorg_xserver_params(const struct session_parameters *s,
         list_add_strdup_multi(params,
                               xserver, screen,
                               "-auth", authfile,
-                              NULL);
+                              LIST_ADD_STRDUP_TERM);
 
         /* additional parameters from sesman.ini file */
         list_append_list_strdup(g_cfg->xorg_params, params, 1);
@@ -451,7 +451,7 @@ prepare_xvnc_xserver_params(const struct session_parameters *s,
                               "-auth", authfile,
                               "-geometry", geometry,
                               "-depth", depth,
-                              NULL);
+                              LIST_ADD_STRDUP_TERM);
 
         if (passwd_file != NULL)
         {
@@ -459,7 +459,7 @@ prepare_xvnc_xserver_params(const struct session_parameters *s,
             env_check_password_file(passwd_file, guid_str);
             list_add_strdup_multi(params,
                                   "-rfbauth", passwd_file,
-                                  NULL);
+                                  LIST_ADD_STRDUP_TERM);
         }
         else if (port != NULL)
         {
@@ -478,7 +478,7 @@ prepare_xvnc_xserver_params(const struct session_parameters *s,
                                   "-rfbunixpath", port,
                                   "-rfbunixmode", sock_mode,
                                   "-SecurityTypes", "None",
-                                  NULL);
+                                  LIST_ADD_STRDUP_TERM);
         }
 
         /* additional parameters from sesman.ini file */
