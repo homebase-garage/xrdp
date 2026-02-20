@@ -133,7 +133,7 @@ START_TEST(test_list__simple_strdup_multi)
     list_add_strdup_multi(lst,
                           "0", "1", "2", "3", "4", "5",
                           "6", "7", "8", "9", "10", "11",
-                          NULL);
+                          LIST_ADD_STRDUP_TERM);
 
     ck_assert_int_eq(lst->count, 12);
 

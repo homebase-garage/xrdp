@@ -69,7 +69,8 @@ create_exec_args_add_entries(struct list *args)
 
     if (g_strcmp(g_cfg->sesman_ini, DEFAULT_SESMAN_INI) != 0)
     {
-        if (!list_add_strdup_multi(args, "-c", g_cfg->sesman_ini, NULL))
+        if (!list_add_strdup_multi(args, "-c", g_cfg->sesman_ini,
+                                   LIST_ADD_STRDUP_TERM))
         {
             return 0;
         }

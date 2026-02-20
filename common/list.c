@@ -271,7 +271,7 @@ list_add_strdup_multi(struct list *self, ...)
     int rv = 1;
 
     va_start(ap, self);
-    while ((s = va_arg(ap, const char *)) != NULL)
+    while ((s = va_arg(ap, const char *)) != LIST_ADD_STRDUP_TERM)
     {
         if (!list_add_strdup(self, s))
         {

@@ -149,12 +149,16 @@ list_add_strdup(struct list *self, const char *str);
  *
  * This is a convenience function for a common operation
  * @param self List to append to
- * @param ... Strings to append. Terminate the list with a NULL.
+ * @param ... Strings to append. Terminate the list with LIST_ADD_STRDUP_TERM
  *
  * @result 0 if any memory allocation failure occurred. In this case
  * the list is unchanged.
  */
 
+/*
+ * We need a typed terminator to guarantee the stack object is the
+ * correct size (cf C99 std 6.2.5(12) for static checkers */
+#define LIST_ADD_STRDUP_TERM ((const char *)0)
 int
 list_add_strdup_multi(struct list *self, ...);
 

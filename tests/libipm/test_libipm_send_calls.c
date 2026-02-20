@@ -349,7 +349,8 @@ START_TEST(test_libipm_send_s_type)
     ck_assert_int_eq(status, E_LI_SUCCESS);
 
     /* Check passing a NULL string doesn't crash the program */
-    status = libipm_msg_out_init(g_t_out, TEST_MESSAGE_NO, "s", NULL);
+    status = libipm_msg_out_init(g_t_out, TEST_MESSAGE_NO,
+                                 "s", (const char *)0);
     ck_assert_int_eq(status, E_LI_PROGRAM_ERROR);
 }
 END_TEST
@@ -409,7 +410,8 @@ START_TEST(test_libipm_send_B_type)
     desc.data = NULL;
     status = libipm_msg_out_init(g_t_out, TEST_MESSAGE_NO, "B", &desc);
     ck_assert_int_eq(status, E_LI_PROGRAM_ERROR);
-    status = libipm_msg_out_init(g_t_out, TEST_MESSAGE_NO, "B", NULL);
+    status = libipm_msg_out_init(g_t_out, TEST_MESSAGE_NO, "B",
+                                 (const struct libipm_fsb *)0);
     ck_assert_int_eq(status, E_LI_PROGRAM_ERROR);
 }
 END_TEST
@@ -447,7 +449,7 @@ START_TEST(test_libipm_send_bad_types)
         format[0] = c;
         status = libipm_msg_out_init(g_t_out,
                                      TEST_MESSAGE_NO_STRING_NO,
-                                     format, NULL);
+                                     format, (const char *)0);
         if (status != expected_status)
         {
             ck_abort_msg("Output char '%c'. Expected status %d, got %d",
