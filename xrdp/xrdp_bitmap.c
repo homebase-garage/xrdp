@@ -160,7 +160,7 @@ xrdp_bitmap_hash_crc(struct xrdp_bitmap *self)
 {
     void *hash;
     int bytes;
-    int crc;
+    unsigned int crc;
     int index;
     char hash_data[16];
 
@@ -213,7 +213,7 @@ xrdp_bitmap_copy_box_with_crc(struct xrdp_bitmap *self,
     int destx;
     int desty;
     int pixel;
-    int crc;
+    unsigned int crc;
     int incs;
     int incd;
     tui8 *s8;

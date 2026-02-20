@@ -713,7 +713,7 @@ struct xrdp_bitmap
     struct xrdp_bitmap *popped_from;
     int item_height;
     /* crc */
-    int crc32;
+    unsigned int crc32;
     int crc16;
 };
 
