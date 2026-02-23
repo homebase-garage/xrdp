@@ -49,6 +49,8 @@ typedef int bool_t;
 // Define Unicode character types
 #if defined(HAVE_UCHAR_H)
 #include <uchar.h>
+#elif defined (__APPLE__) && defined(__cplusplus)
+// char16_t and char32_t are in stdint.h (C++ only)
 #elif defined(HAVE_STDINT_H)
 typedef uint_least16_t char16_t;
 typedef uint_least32_t char32_t;
