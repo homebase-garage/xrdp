@@ -308,11 +308,11 @@ trans_send_waiting(struct trans *self, int block)
 int
 trans_check_wait_objs(struct trans *self)
 {
-    tbus in_sck = (tbus) 0;
+    tbus in_sck;
     struct trans *in_trans = (struct trans *) NULL;
-    int read_bytes = 0;
-    unsigned int to_read = 0;
-    unsigned int read_so_far = 0;
+    int read_bytes;
+    unsigned int to_read;
+    unsigned int read_so_far;
     int rv = 0;
     enum xrdp_source cur_source;
 
@@ -616,7 +616,6 @@ trans_write_copy_s(struct trans *self, struct stream *out_s)
         return 1;
     }
     out_data = out_s->data;
-    sent = 0;
     size = (int) (out_s->end - out_s->data);
     if (self->wait_s == 0)
     {

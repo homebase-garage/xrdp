@@ -488,7 +488,6 @@ scard_function_establish_context_return(void *user_data,
         return 1;
     }
     con = uds_client->con;
-    lcontext = 0;
     app_context = 0;
     g_memset(context, 0, 16);
     if (status == 0)

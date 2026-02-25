@@ -975,11 +975,10 @@ scard_send_ReleaseContext(IRP *irp, char *context, int context_bytes)
 {
     /* see [MS-RDPESC] 3.1.4.2 */
 
-    SMARTCARD     *sc;
     struct stream *s;
     int            bytes;
 
-    if ((sc = smartcards[irp->scard_index]) == NULL)
+    if (smartcards[irp->scard_index] == NULL)
     {
         LOG_DEVEL(LOG_LEVEL_ERROR, "smartcards[%d] is NULL", irp->scard_index);
         return;
@@ -1026,11 +1025,10 @@ scard_send_IsContextValid(IRP *irp, char *context, int context_bytes)
 {
     /* see [MS-RDPESC] 3.1.4.3 */
 
-    SMARTCARD     *sc;
     struct stream *s;
     int            bytes;
 
-    if ((sc = smartcards[irp->scard_index]) == NULL)
+    if (smartcards[irp->scard_index] == NULL)
     {
         LOG_DEVEL(LOG_LEVEL_ERROR, "smartcards[%d] is NULL", irp->scard_index);
         return;
@@ -1138,7 +1136,6 @@ scard_send_ListReaders(IRP *irp, char *context, int context_bytes,
      *
      */
 
-    SMARTCARD     *sc;
     struct stream *s;
     int            bytes;
     int            bytes_groups = 0; // Length of NDR for groups + 2 terminators
@@ -1146,7 +1143,7 @@ scard_send_ListReaders(IRP *irp, char *context, int context_bytes,
     int            groups_len = 0; // strlen(groups)
     tui32          ioctl;
 
-    if ((sc = smartcards[irp->scard_index]) == NULL)
+    if (smartcards[irp->scard_index] == NULL)
     {
         LOG_DEVEL(LOG_LEVEL_ERROR, "smartcards[%d] is NULL", irp->scard_index);
         return;
@@ -1357,14 +1354,13 @@ scard_send_GetStatusChange(IRP *irp, char *context, int context_bytes,
      * ??       String names pointed to in the above array.
      */
 
-    SMARTCARD     *sc;
     READER_STATE  *rs;
     struct stream *s;
     tui32          ioctl;
     int            bytes;
     unsigned int   i;
 
-    if ((sc = smartcards[irp->scard_index]) == NULL)
+    if (smartcards[irp->scard_index] == NULL)
     {
         LOG_DEVEL(LOG_LEVEL_ERROR, "smartcards[%d] is NULL", irp->scard_index);
         return;
@@ -1507,12 +1503,11 @@ scard_send_Connect(IRP *irp, char *context, int context_bytes,
      * ??       Conformant Array pointed to by pbContext
      *
      */
-    SMARTCARD     *sc;
     struct stream *s;
     tui32          ioctl;
     int            bytes;
 
-    if ((sc = smartcards[irp->scard_index]) == NULL)
+    if (smartcards[irp->scard_index] == NULL)
     {
         LOG_DEVEL(LOG_LEVEL_ERROR, "smartcards[%d] is NULL", irp->scard_index);
         return;
@@ -1586,11 +1581,10 @@ scard_send_Reconnect(IRP *irp, char *context, int context_bytes,
     /* see [MS-RDPESC] 2.2.2.15 */
     /* see [MS-RDPESC] 3.1.4.36 */
 
-    SMARTCARD     *sc;
     struct stream *s;
     int            bytes;
 
-    if ((sc = smartcards[irp->scard_index]) == NULL)
+    if (smartcards[irp->scard_index] == NULL)
     {
         LOG_DEVEL(LOG_LEVEL_ERROR, "smartcards[%d] is NULL", irp->scard_index);
         return;
@@ -1655,11 +1649,10 @@ scard_send_BeginTransaction(IRP *irp, char *context, int context_bytes,
 {
     /* see [MS-RDPESC] 4.9 */
 
-    SMARTCARD     *sc;
     struct stream *s;
     int            bytes;
 
-    if ((sc = smartcards[irp->scard_index]) == NULL)
+    if (smartcards[irp->scard_index] == NULL)
     {
         LOG_DEVEL(LOG_LEVEL_ERROR, "smartcards[%d] is NULL", irp->scard_index);
         return;
@@ -1721,11 +1714,10 @@ scard_send_EndTransaction(IRP *irp, char *context, int context_bytes,
 {
     /* see [MS-RDPESC] 3.1.4.32 */
 
-    SMARTCARD     *sc;
     struct stream *s;
     int            bytes;
 
-    if ((sc = smartcards[irp->scard_index]) == NULL)
+    if (smartcards[irp->scard_index] == NULL)
     {
         LOG_DEVEL(LOG_LEVEL_ERROR, "smartcards[%d] is NULL", irp->scard_index);
         return;
@@ -1787,12 +1779,11 @@ scard_send_Status(IRP *irp, int wide, char *context, int context_bytes,
 {
     /* see [MS-RDPESC] 2.2.2.18 */
 
-    SMARTCARD     *sc;
     struct stream *s;
     int            bytes;
     tui32          ioctl;
 
-    if ((sc = smartcards[irp->scard_index]) == NULL)
+    if (smartcards[irp->scard_index] == NULL)
     {
         LOG_DEVEL(LOG_LEVEL_ERROR, "smartcards[%d] is NULL", irp->scard_index);
         return;
@@ -1872,11 +1863,10 @@ scard_send_Disconnect(IRP *irp, char *context, int context_bytes,
 {
     /* see [MS-RDPESC] 3.1.4.30 */
 
-    SMARTCARD     *sc;
     struct stream *s;
     int            bytes;
 
-    if ((sc = smartcards[irp->scard_index]) == NULL)
+    if (smartcards[irp->scard_index] == NULL)
     {
         LOG_DEVEL(LOG_LEVEL_ERROR, "smartcards[%d] is NULL", irp->scard_index);
         return;
@@ -1939,12 +1929,11 @@ scard_send_Transmit(IRP *irp, char *context, int context_bytes,
 {
     /* see [MS-RDPESC] 2.2.2.19 */
 
-    SMARTCARD     *sc;
     struct stream *s;
     int            bytes;
     int            val;
 
-    if ((sc = smartcards[irp->scard_index]) == NULL)
+    if (smartcards[irp->scard_index] == NULL)
     {
         LOG_DEVEL(LOG_LEVEL_ERROR, "smartcards[%d] is NULL", irp->scard_index);
         return 1;
@@ -2127,12 +2116,11 @@ scard_send_Control(IRP *irp, char *context, int context_bytes,
 {
     /* see [MS-RDPESC] 2.2.2.19 */
 
-    SMARTCARD     *sc;
     struct stream *s;
     int            bytes;
     int            val;
 
-    if ((sc = smartcards[irp->scard_index]) == NULL)
+    if (smartcards[irp->scard_index] == NULL)
     {
         LOG_DEVEL(LOG_LEVEL_ERROR, "smartcards[%d] is NULL", irp->scard_index);
         return 1;
@@ -2201,11 +2189,10 @@ scard_send_Cancel(IRP *irp, char *context, int context_bytes)
 {
     /* see [MS-RDPESC] 3.1.4.27 */
 
-    SMARTCARD     *sc;
     struct stream *s;
     int            bytes;
 
-    if ((sc = smartcards[irp->scard_index]) == NULL)
+    if (smartcards[irp->scard_index] == NULL)
     {
         LOG_DEVEL(LOG_LEVEL_ERROR, "smartcards[%d] is NULL", irp->scard_index);
         return 1;
@@ -2253,11 +2240,10 @@ scard_send_GetAttrib(IRP *irp, char *card, int card_bytes, READER_STATE *rs)
 {
     /* see [MS-RDPESC] 2.2.2.21 */
 
-    SMARTCARD     *sc;
     struct stream *s;
     int            bytes;
 
-    if ((sc = smartcards[irp->scard_index]) == NULL)
+    if (smartcards[irp->scard_index] == NULL)
     {
         LOG_DEVEL(LOG_LEVEL_ERROR, "smartcards[%d] is NULL", irp->scard_index);
         return 1;

@@ -777,7 +777,7 @@ g_strtrim(char *str, int trim_flags)
 char *
 g_strnjoin(char *dest, int dest_len, const char *joiner, const char *src[], int src_len)
 {
-    int len = 0;
+    int len;
     int joiner_len;
     int i = 0;
     int dest_remaining;

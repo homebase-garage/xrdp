@@ -2060,7 +2060,7 @@ g_obj_wait(tintptr *read_objs, int rcount, tintptr *write_objs, int wcount,
 #else
     struct pollfd pollfd[MAX_HANDLES];
     int sck;
-    int i = 0;
+    int i;
     unsigned int j = 0;
     int rv = 1;
 

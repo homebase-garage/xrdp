@@ -843,13 +843,13 @@ xrdp_mcs_out_gcc_data(struct xrdp_sec *self)
     int gcc_size;
     char *gcc_size_ptr;
     char *ud_ptr;
-    int header_length = 0;
-    int server_cert_len = 0;
-    int public_key_blob_len = 0;
-    int key_len = 0;
-    int bit_len = 0;
-    int data_len = 0;
-    int modulus_len = 0;
+    int header_length;
+    int server_cert_len;
+    int public_key_blob_len;
+    int key_len;
+    int bit_len;
+    int data_len;
+    int modulus_len;
 
     num_channels = self->mcs_layer->channel_list->count;
     num_channels_even = num_channels + (num_channels & 1);

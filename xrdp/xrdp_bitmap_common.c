@@ -185,7 +185,7 @@ xrdp_bitmap_create_with_data(int width, int height,
 void
 xrdp_bitmap_delete(struct xrdp_bitmap *self)
 {
-    int i = 0;
+    int i;
     struct xrdp_mod_data *mod_data = (struct xrdp_mod_data *)NULL;
 
     if (self == 0)

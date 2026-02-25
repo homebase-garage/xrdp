@@ -57,8 +57,6 @@ int
 main(int argc, char **argv)
 {
     void    *channel;
-    int     written = 0;
-    int     first_time = 1;
 
     if (argc < 2)
     {

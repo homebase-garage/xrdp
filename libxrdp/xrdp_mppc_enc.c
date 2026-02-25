@@ -560,10 +560,10 @@ compress_rdp_5(struct xrdp_mppc_enc *enc, tui8 *srcData, int len)
     tui32 data_end;
     tui8 byte_val;
 
-    crc = 0;
+    lom = 0;
+    ctr = 0;
     opb_index = 0;
     bits_left = 8;
-    copy_offset = 0;
     hash_table = enc->hash_table;
     hbuf_start = enc->historyBuffer;
     outputBuffer = enc->outputBuffer;
@@ -587,8 +587,6 @@ compress_rdp_5(struct xrdp_mppc_enc *enc, tui8 *srcData, int len)
 
     /* point to start of data to be compressed */
     historyPointer = &(enc->historyBuffer[historyOffset]);
-
-    ctr = copy_offset = lom = 0;
 
     /* if we are at start of history buffer, do not attempt to compress */
     /* first 2 bytes, because minimum LoM is 3                          */

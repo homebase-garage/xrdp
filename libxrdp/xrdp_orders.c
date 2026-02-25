@@ -450,7 +450,7 @@ xrdp_order_pack_small_or_tiny(struct xrdp_orders *self,
 {
     int move_up_count = 0;
     int index = 0;
-    int size = 0;
+    int size;
     int keep_looking = 1;
 
     move_up_count = 0;
@@ -2237,9 +2237,9 @@ xrdp_orders_send_raw_bitmap(struct xrdp_orders *self,
     int len = 0;
     int bufsize = 0;
     int Bpp = 0;
-    int i = 0;
-    int j = 0;
-    int pixel = 0;
+    int i;
+    int j;
+    int pixel;
     int e = 0;
     int max_order_size;
     struct xrdp_client_info *ci;
@@ -2664,8 +2664,8 @@ xrdp_orders_send_raw_bitmap2(struct xrdp_orders *self,
     int bufsize = 0;
     int Bpp = 0;
     int i = 0;
-    int j = 0;
-    int pixel = 0;
+    int j;
+    int pixel;
     int e = 0;
     int max_order_size;
     struct xrdp_client_info *ci;

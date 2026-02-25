@@ -2966,7 +2966,7 @@ static int
 parse_chansrvport(const char *value, char *dest, int dest_size, int uid)
 {
     int rv = 0;
-    int dnum = 0;
+    int dnum;
 
     if (value == NULL)
     {
