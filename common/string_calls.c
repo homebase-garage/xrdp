@@ -232,7 +232,10 @@ g_get_display_string(char buff[], unsigned int bufflen)
         // Return the unqualified part of the name
         p = strrchr(str, '/');
         p = (p != NULL) ? (p + 1) : str;
-        strlcpy(buff, p, bufflen);
+        if (strlcpy(buff, p, bufflen) >= bufflen)
+        {
+            rv = -1; /* Buffer overflow */
+        }
     }
     else if ((str = g_getenv("DISPLAY")) != NULL)
     {
@@ -240,7 +243,11 @@ g_get_display_string(char buff[], unsigned int bufflen)
 
         if (n >= 0)
         {
-            g_snprintf(buff, bufflen, "X11-%d", n);
+            if ((unsigned int)g_snprintf(buff, bufflen, "X11-%d", n)
+                    >= bufflen)
+            {
+                rv = -1; /* Buffer overflow */
+            }
         }
         else
         {

@@ -49,7 +49,7 @@ int main(int argc, char **argv)
 
     if (g_get_display_string(disstr, sizeof(disstr)) < 0)
     {
-        printf("Can't find teh display from the environment\n");
+        printf("Can't find the display from the environment\n");
         return 1;
     }
 

@@ -682,13 +682,12 @@ start_x_server(const struct login_info *login_info,
                  g_cfg->env_names,
                  g_cfg->env_values);
 
-    if (sp->type == SCP_SESSION_TYPE_XVNC)
+    /* Allocate the passwd_file if required */
+    if (sp->type == SCP_SESSION_TYPE_XVNC &&
+            (passwd_file = get_xvnc_passwd_file_name(sp->x11_display)) == NULL)
     {
-        char guid_str[GUID_STR_SIZE];
-        passwd_file = get_xvnc_passwd_file_name(sp->x11_display);
-
-        guid_to_str(&sp->guid, guid_str);
-        set_xvnc_passwd(passwd_file, guid_str);
+        /* An error has been logged */
+        return;
     }
 
     /* prepare the Xauthority stuff */
@@ -714,6 +713,7 @@ start_x_server(const struct login_info *login_info,
     {
         switch (sp->type)
         {
+                char guid_str[GUID_STR_SIZE];
                 char port[256];
 
             case SCP_SESSION_TYPE_XORG:
@@ -721,6 +721,8 @@ start_x_server(const struct login_info *login_info,
                 break;
 
             case SCP_SESSION_TYPE_XVNC:
+                guid_to_str(&sp->guid, guid_str);
+                set_xvnc_passwd(passwd_file, guid_str);
                 xserver_params = prepare_xvnc_xserver_params(sd, authfile,
                                  passwd_file, NULL);
                 break;

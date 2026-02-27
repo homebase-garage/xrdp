@@ -2963,7 +2963,7 @@ cleanup_states(struct xrdp_mm *self)
  */
 
 static int
-parse_chansrvport(const char *value, char *dest, int dest_size, int uid)
+parse_chansrvport(const char *value, char dest[], int dest_size, int uid)
 {
     int rv = 0;
     char dstr[MAX_DISPLAY_NAME_SIZE];
@@ -3003,8 +3003,14 @@ parse_chansrvport(const char *value, char *dest, int dest_size, int uid)
         {
             // X11 compatibility
             int dnum = g_atoi(dstr);
-            (void)g_get_display_string_from_x11_display(
-                dnum, dstr, sizeof(dstr));
+            if (g_get_display_string_from_x11_display(
+                        dnum, dstr, sizeof(dstr)) < 0)
+            {
+                LOG(LOG_LEVEL_WARNING,
+                    "Ignoring chansrvport string "
+                    "with bad X11 display number '%s'", value);
+                return -1;
+            }
         }
 
         if (*end == ',')
