@@ -364,7 +364,7 @@ int main(int argc, char **argv)
         "capslock", "capslockaltgr", "shiftcapslock", "shiftcapslockaltgr",
         "numlock"
     };
-    int states[NUM_STATES] = {0, 1, 0x80, 0x81, 2, 0x82, 3, 0x83, 0x10};
+    const int states[NUM_STATES] = {0, 1, 0x80, 0x81, 2, 0x82, 3, 0x83, 0x10};
     int idx;
     Display *dpy = NULL;
     FILE *outf = NULL;

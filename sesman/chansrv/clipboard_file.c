@@ -108,7 +108,7 @@ decode_rfc3986(const char *rfc3986, int len)
             if (rfc3986[i] == '%' && (len - i) > 2 &&
                     isxdigit(rfc3986[i + 1]) && isxdigit(rfc3986[i + 2]))
             {
-                char jchr[] = { rfc3986[i + 1], rfc3986[i + 2], '\0' };
+                const char jchr[] = { rfc3986[i + 1], rfc3986[i + 2], '\0' };
                 result[j++] = g_htoi(jchr);
                 i += 3;
             }
