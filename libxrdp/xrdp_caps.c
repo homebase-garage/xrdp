@@ -729,17 +729,14 @@ xrdp_caps_process_frame_ack(struct xrdp_rdp *self, struct stream *s, int len)
 static int
 xrdp_caps_process_surface_cmds(struct xrdp_rdp *self, struct stream *s, int len)
 {
+#ifdef USE_DEVEL_LOGGING
     int cmdFlags;
-#ifndef USE_DEVEL_LOGGING
-    /* TODO: remove UNUSED_VAR once the `cmdFlags` variable is used for more than
-    logging in debug mode */
-    UNUSED_VAR(cmdFlags);
-#endif
 
     LOG_DEVEL(LOG_LEVEL_TRACE, "xrdp_caps_process_surface_cmds:");
     in_uint32_le(s, cmdFlags);
     in_uint8s(s, 4); /* reserved */
     LOG_DEVEL(LOG_LEVEL_TRACE, "  cmdFlags 0x%08x", cmdFlags);
+#endif
     return 0;
 }
 

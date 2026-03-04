@@ -582,7 +582,7 @@ process_connect_session_request(struct scp_list_item *sli)
     const char *client_ip;
     const char *client_name;
     unsigned int flags;
-    enum scp_sconnect_status status = E_SCP_SCONNECT_OK;
+    enum scp_sconnect_status status;
 
     rv = scp_get_connect_session_request(sli->client_trans, &guid,
                                          &client_ip, &client_name, &flags);

@@ -1615,7 +1615,7 @@ devredir_file_create(struct state_create *fusep, tui32 device_id,
 {
     tui32  DesiredAccess;
     tui32  CreateOptions;
-    tui32  FileAttributes = 0;
+    tui32  FileAttributes;
     tui32  CreateDisposition;
     int    rval = -1;
     IRP   *irp;
@@ -1813,14 +1813,13 @@ devredir_file_read(struct state_read *fusep, tui32 DeviceId, tui32 FileId,
                    tui32 Length, tui64 Offset)
 {
     struct stream *s;
-    IRP           *irp;
     IRP           *new_irp;
     int            bytes;
 
     xstream_new(s, 1024);
 
     /* Check we've got an open IRP for this file already */
-    if ((irp = devredir_irp_find_by_fileid(FileId)) == NULL)
+    if (devredir_irp_find_by_fileid(FileId) == NULL)
     {
         LOG_DEVEL(LOG_LEVEL_ERROR, "no IRP found with FileId = %d", FileId);
         xfuse_devredir_cb_read_file(fusep, STATUS_UNSUCCESSFUL, NULL, 0);
@@ -1870,7 +1869,6 @@ devredir_file_write(struct state_write *fusep, tui32 DeviceId, tui32 FileId,
                     const char *buf, int Length, tui64 Offset)
 {
     struct stream *s;
-    IRP           *irp;
     IRP           *new_irp;
     int            bytes;
 
@@ -1879,7 +1877,7 @@ devredir_file_write(struct state_write *fusep, tui32 DeviceId, tui32 FileId,
 
     xstream_new(s, 1024 + Length);
 
-    if ((irp = devredir_irp_find_by_fileid(FileId)) == NULL)
+    if (devredir_irp_find_by_fileid(FileId) == NULL)
     {
         LOG_DEVEL(LOG_LEVEL_ERROR, "no IRP found with FileId = %d", FileId);
         xfuse_devredir_cb_write_file(fusep, STATUS_UNSUCCESSFUL, 0, 0);

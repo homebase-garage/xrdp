@@ -48,7 +48,7 @@ xrdp_rdp_read_config(const char *xrdp_ini, struct xrdp_client_info *client_info)
     char *value = NULL;
     int pos;
     char *tmp = NULL;
-    int tmp_length = 0;
+    int tmp_length;
 
     client_info->xrdp_keyboard_overrides.type = -1;
     client_info->xrdp_keyboard_overrides.subtype = -1;
@@ -461,10 +461,10 @@ xrdp_rdp_init_data(struct xrdp_rdp *self, struct stream *s)
 int
 xrdp_rdp_recv(struct xrdp_rdp *self, struct stream *s, int *code)
 {
-    int error = 0;
+    int error;
     int len = 0;
     int pdu_code = 0;
-    int chan = 0;
+    int chan;
     const tui8 *header;
 
 

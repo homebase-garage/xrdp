@@ -1015,7 +1015,7 @@ internal_log_message(const enum logLevels lvl,
     char buff[LOG_BUFFER_SIZE + 43]; /* 31 ("[2022-10-07T19:58:33.065+0900] ") + 8 (log level) + 4 (space+cr+lf+\0) */
     int len = 0;
     enum logReturns rv = LOG_STARTUP_OK;
-    int writereply = 0;
+    int writereply;
 
     if (g_staticLogConfig == NULL)
     {

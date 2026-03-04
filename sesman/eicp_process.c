@@ -100,7 +100,7 @@ static int
 process_create_session_response(struct scp_list_item *sli)
 {
     struct session_item *s_item;
-    int display = -1;
+    int display;
     struct guid guid;
     enum scp_screate_status status;
 

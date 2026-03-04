@@ -323,7 +323,7 @@ libxrdp_send_palette(struct xrdp_session *session, int *palette)
 {
     int rv;
     int i = 0;
-    int color = 0;
+    int color;
     struct stream *s = (struct stream *)NULL;
 
     if (session->client_info->bpp > 8)

@@ -348,7 +348,7 @@ close_ccp_trans(void)
 static int
 sesexec_main_loop(void)
 {
-    int error = 0;
+    int error;
     int robjs_count;
     intptr_t robjs[MAX_ROBJS];
 

@@ -2237,7 +2237,7 @@ xrdp_sec_incoming(struct xrdp_sec *self)
     struct list *items = NULL;
     struct list *values = NULL;
     struct xrdp_iso *iso;
-    int index = 0;
+    int index;
     char *item = NULL;
     char *value = NULL;
     char key_file[256];

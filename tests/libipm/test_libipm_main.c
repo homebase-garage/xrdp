@@ -36,7 +36,6 @@ static void
 suite_test_libipm_calls_start(void)
 {
     int sck[2];
-    int istatus;
     struct trans *t1 = NULL;
     struct trans *t2 = NULL;
     struct trans *t3 = NULL;
@@ -63,7 +62,7 @@ suite_test_libipm_calls_start(void)
         const char *errstr = g_get_strerror();
         LOG(LOG_LEVEL_ERROR, "Can't open /dev/zero [%s]", errstr);
     }
-    else if ((istatus = g_sck_local_socketpair(sck)) < 0)
+    else if (g_sck_local_socketpair(sck) < 0)
     {
         const char *errstr = g_get_strerror();
         LOG(LOG_LEVEL_ERROR, "Can't create test sockets [%s]", errstr);

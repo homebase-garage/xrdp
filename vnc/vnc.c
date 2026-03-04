@@ -683,8 +683,8 @@ lib_mod_event(struct vnc *v, int msg, long param1, long param2,
 static int
 get_pixel_safe(char *data, int x, int y, int width, int height, int bpp)
 {
-    int start = 0;
-    int shift = 0;
+    int start;
+    int shift;
 
     if (x < 0)
     {
@@ -753,8 +753,8 @@ static void
 set_pixel_safe(char *data, int x, int y, int width, int height, int bpp,
                int pixel)
 {
-    int start = 0;
-    int shift = 0;
+    int start;
+    int shift;
 
     if (x < 0)
     {
