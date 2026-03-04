@@ -35,6 +35,7 @@
 #include <poll.h>
 
 #include "log.h"
+#include "xrdp_constants.h"
 #include "xrdp_sockets.h"
 #include "string_calls.h"
 #include "channel_defs.h"
@@ -43,7 +44,7 @@
 struct wts_obj
 {
     int fd;
-    int display_num;
+    char display_name[MAX_DISPLAY_NAME_SIZE];
 };
 
 /**
@@ -132,8 +133,7 @@ VirtualChannelOpen(unsigned int SessionId, const char *pVirtualName,
         return 0;
     }
     wts->fd = -1;
-    wts->display_num = g_get_display_num_from_display(getenv("DISPLAY"));
-    if (wts->display_num < 0)
+    if (g_get_display_string(wts->display_name, sizeof(wts->display_name)) < 0)
     {
         LOG(LOG_LEVEL_ERROR, "WTSVirtualChannelOpenEx: fatal error; invalid DISPLAY");
         *errcode = WTS_E_RESOURCE_ERROR;
@@ -162,7 +162,8 @@ VirtualChannelOpen(unsigned int SessionId, const char *pVirtualName,
     memset(&s, 0, sizeof(struct sockaddr_un));
     s.sun_family = AF_UNIX;
     bytes = sizeof(s.sun_path);
-    snprintf(s.sun_path, bytes - 1, CHANSRV_API_STR, getuid(), wts->display_num);
+    snprintf(s.sun_path, bytes - 1, CHANSRV_API_STR,
+             getuid(), wts->display_name);
     s.sun_path[bytes - 1] = 0;
     bytes = sizeof(struct sockaddr_un);
 

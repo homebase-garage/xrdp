@@ -190,14 +190,37 @@ char *
 g_bytes_to_hexdump(const char *src, int len);
 
 /**
- * Extracts the display number from an X11 display string
+ * Converts an X11 display number to a display string
  *
- * @param display_text Display string (i.e. g_getenv("DISPLAY"))
- *
- * @result <0 if the string could not be parsed, or >=0 for a display number
+ * @param display_num X11 display unmber
+ * @param buff Buffer for result
+ * @param bufflen size of above
+ * @return != 0 if the result doesn't fit
  */
 int
-g_get_display_num_from_display(const char *display_text);
+g_get_display_string_from_x11_display(int display_num,
+                                      char buff[], unsigned int bufflen);
+/**
+ * Converts a display string to an X11 display number
+ *
+ * @param display_str Display string
+ * @return X11 display number, or -1 if the display string isn't X11
+ */
+int
+g_get_x11_display_from_display_string(const char *display_str);
+
+/**
+ * Extracts the display string from either DISPLAY or WAYLAND_DISPLAY
+ *
+ * @param buff Buffer for result
+ * @param bufflen Length of above buffer
+ *
+ * Returned buffer will be (e.g.) "X11-10" for X11 or "wayland-1" for Wayland
+ *
+ * @result != 0 if the string could not be found or parsed
+ */
+int
+g_get_display_string(char buff[], unsigned int bufflen);
 
 /**
  * Converts a bitmask into a string for output purposes

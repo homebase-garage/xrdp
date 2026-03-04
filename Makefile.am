@@ -1,5 +1,13 @@
 ACLOCAL_AMFLAGS = -I m4
+# Redefine the localstatedir to stop github CI defaulting to
+# something like /home/runner/work/xrdp/xrdp/xrdp-0.10.80/_inst/var
+#
+# A path this long (50 chars) can trigger some -Werror=format-truncation
+# errors when using the XRDP_SOCKET_ROOT_PATH macro to create a Unix
+# domain socket name, as these names have a quite short length (108
+# characters on Linux).
 AM_DISTCHECK_CONFIGURE_FLAGS = \
+  --localstatedir=/distcheckdummy/var \
   --without-systemdsystemunitdir \
   --enable-strict-locations \
   --enable-tests

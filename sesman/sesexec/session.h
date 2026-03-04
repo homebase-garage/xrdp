@@ -41,7 +41,7 @@ struct proc_exit_status;
  */
 struct session_parameters
 {
-    unsigned int display;
+    int x11_display;   // >= 0 for X11 only
     enum scp_session_type type;
     unsigned short width;
     unsigned short height;
@@ -113,6 +113,17 @@ session_get_start_time(const struct session_data *sd);
  */
 unsigned int
 session_get_connect_count(const struct session_data *sd);
+
+/**
+ * Get a pointer to the session display name
+ *
+ * @param self session_data object
+ * @return session name ("X11-n" or "wayland-n")
+ *
+ * A session name is set by a successful call to session_start()
+ */
+const char *
+session_get_display(const struct session_data *sd);
 
 /**
  * Increment the connect count for an active session
