@@ -160,7 +160,7 @@ END_TEST
 /******************************************************************************/
 START_TEST(test_get_next_char__section_2)
 {
-    struct utf8_decode_sub_test tests[] =
+    const struct utf8_decode_sub_test tests[] =
     {
         // 2.1  First possible sequence of a certain length
         //
@@ -209,7 +209,7 @@ END_TEST
 /******************************************************************************/
 START_TEST(test_get_next_char__section_3)
 {
-    struct utf8_decode_sub_test tests[] =
+    const struct utf8_decode_sub_test tests[] =
     {
         // 3.1  Unexpected continuation bytes
         //
@@ -349,7 +349,7 @@ END_TEST
 /******************************************************************************/
 START_TEST(test_get_next_char__section_4)
 {
-    struct utf8_decode_sub_test tests[] =
+    const struct utf8_decode_sub_test tests[] =
     {
         // 4.1  Examples of an overlong ASCII character
         //
@@ -399,7 +399,7 @@ END_TEST
 /******************************************************************************/
 START_TEST(test_get_next_char__section_5)
 {
-    struct utf8_decode_sub_test tests[] =
+    const struct utf8_decode_sub_test tests[] =
     {
         // 5  Illegal code positions
 
@@ -515,7 +515,7 @@ END_TEST
 /******************************************************************************/
 START_TEST(test_utf_char32_to_utf8)
 {
-    struct utf8_encode_sub_test tests[] =
+    const struct utf8_encode_sub_test tests[] =
     {
 
         // E2.1  First possible sequence of a certain length

@@ -99,7 +99,7 @@ test_small_type_values(char typechar,
 {
     unsigned int i;
     enum libipm_status status;
-    char format[] = { typechar, '\0'};
+    const char format[] = { typechar, '\0'};
 
     for (i = 0 ; i < count; ++i)
     {
