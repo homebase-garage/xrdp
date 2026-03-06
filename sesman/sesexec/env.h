@@ -46,10 +46,12 @@ env_check_password_file(const char *filename, const char *password);
  * @param uid user ID
  * @param env_names List of session environment variables to set
  * @param env_values List of session environment values to set
- * @return 0 on success, g_getuser_info() error codes on error
+ *
+ * On error, the calling process exits, to prevent privilege
+ * escalations.
  *
  */
-int
+void
 env_set_user(int uid,
              const struct list *env_names, const struct list *env_values);
 
