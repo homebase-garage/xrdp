@@ -936,22 +936,7 @@ xrdp_egfx_open_response(struct xrdp_process *id, int chan_id,
 static int
 xrdp_egfx_close_response(struct xrdp_process *id, int chan_id)
 {
-    struct xrdp_mm *mm;
-
     LOG(LOG_LEVEL_TRACE, "xrdp_egfx_close_response:");
-
-    mm = id->wm->mm;
-
-    if (mm->resize_queue == 0 || mm->resize_queue->count <= 0)
-    {
-        return 0;
-    }
-    if (mm->resize_data != NULL
-            && mm->resize_data->state == WMRZ_EGFX_CONN_CLOSING)
-    {
-        LOG(LOG_LEVEL_DEBUG, "xrdp_egfx_close_response: egfx deleted.");
-        advance_resize_state_machine(mm, WMRZ_EGFX_CONN_CLOSED);
-    }
     return 0;
 }
 
