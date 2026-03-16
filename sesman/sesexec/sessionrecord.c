@@ -71,9 +71,9 @@ typedef struct utmp _utmp;
 #include "string_calls.h"
 
 #define XRDP_LINE_FORMAT "xrdp:%s"
-// ut_id is a very small field on some platforms, so use the display
-// number in hex
-#define XRDP_ID_FORMAT ":%x"
+// ut_id is a very small field on some platforms, so use a discriminator
+// (e.g. ':' for x11) and a number in hex
+#define XRDP_ID_FORMAT "%c%x"
 
 /******************************************************************************/
 /**
@@ -106,30 +106,46 @@ str2memcpy(void *dest, const char *src, size_t n)
 
 /******************************************************************************/
 /**
- * Get a display number from the display string
+ * Set the idbuff string
  *
- * Converts the display string to some sort of number to write to the
- * extremely short ut_id field
- * @param display string
- * @return display number
+ * The ut_id field is extremely short (e.g. 4 usable characters on
+ * Linux/FreeBSD).
+ *
+ * @param buff Output buffer, including terminator
+ * @param bufflen Length of above
+ * @param display Display string for the session
  */
-static unsigned int
-get_display_num(const char *display)
+static void
+set_idbuff_str(char buff[], unsigned int bufflen, const char *display)
 {
-    unsigned int result = 0;
-    /* Look for the first digit in the string */
-    while (*display != '\0' && !isdigit(*display))
-    {
-        ++display;
-    }
-    /* convert consecutive digits to a number */
-    while (*display != '\0' && isdigit(*display))
-    {
-        result = (result * 10) + (*display - '0');
-        ++display;
-    }
+    unsigned int display_num = 0;
+    char discriminator;
 
-    return result;
+    // X11 display?
+    int x11_display = g_get_x11_display_from_display_string(display);
+    if (x11_display >= 0)
+    {
+        discriminator = ':';
+        display_num = (unsigned int)x11_display;
+    }
+    else
+    {
+        discriminator = 'W';
+        /* Look for the first digit in the string */
+        while (*display != '\0' && !isdigit(*display))
+        {
+            ++display;
+        }
+        /* convert consecutive digits to a number */
+        display_num = 0;
+        while (*display != '\0' && isdigit(*display))
+        {
+            display_num = (display_num * 10) + (*display - '0');
+            ++display;
+        }
+    }
+    display_num = MIN(display_num, 0xfff);
+    g_snprintf(buff, bufflen, XRDP_ID_FORMAT, discriminator, display_num);
 }
 
 /******************************************************************************/
@@ -158,11 +174,8 @@ add_xtmp_entry(int pid, const char *display,
 
     struct timeval tv;
 
-    /* Convert the display string to a number */
-    unsigned int display_num = get_display_num(display);
-
     g_memset(&ut, 0, sizeof(ut));
-    g_snprintf(idbuff, sizeof(idbuff), XRDP_ID_FORMAT, display_num);
+    set_idbuff_str(idbuff, sizeof(idbuff), display);
     g_snprintf(linebuff, sizeof(linebuff), XRDP_LINE_FORMAT, display);
     gettimeofday(&tv, NULL);
 

@@ -400,9 +400,20 @@ auth_uds(const char *user, enum scp_login_status *errorcode)
 static int
 auth_start_session_private(struct auth_info *auth_info, const char *display)
 {
-    int error;
+    // For Linux and maybe other systems, pam_systemd needs to know the
+    // session type in order to set the session up correctly
+    const char *session_type;
+    if (g_get_x11_display_from_display_string(display) >= 0)
+    {
+        session_type = "x11";
+    }
+    else
+    {
+        session_type = "wayland";
+    }
+    g_setenv_log("XDG_SESSION_TYPE", session_type, 1);
 
-    error = pam_set_item(auth_info->ph, PAM_TTY, display);
+    int error = pam_set_item(auth_info->ph, PAM_TTY, display);
 
     if (error != PAM_SUCCESS)
     {
