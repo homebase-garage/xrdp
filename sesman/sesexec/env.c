@@ -36,6 +36,7 @@
 #include "log.h"
 #include "os_calls.h"
 #include "sesexec.h"
+#include "string_calls.h"
 #include "xrdp_sockets.h"
 
 /******************************************************************************/
@@ -51,8 +52,7 @@ env_set_user(int uid,
     char *pw_username = NULL;
     char *pw_shell = NULL;
     char *pw_dir = NULL;
-    char *display = NULL;
-    int is_x11 = 0;
+    char display[MAX_DISPLAY_NAME_SIZE];
     char text[256];
 
     error = g_getuser_info_by_uid(uid, &pw_username, &pw_gid, &pw_shell,
@@ -99,7 +99,8 @@ env_set_user(int uid,
             g_snprintf(text, sizeof(text), XRDP_SOCKET_PATH, uid);
             g_setenv_log("XRDP_SOCKET_PATH", text, 1);
 
-            // Set the passed-in variables. This may include a DISPLAY
+            // Set the passed-in variables. This may include a DISPLAY,
+            // or WAYLAND_DISPLAY
             if ((env_names != 0) && (env_values != 0) &&
                     (env_names->count == env_values->count))
             {
@@ -108,24 +109,10 @@ env_set_user(int uid,
                     name = (char *) list_get_item(env_names, index),
                     value = (char *) list_get_item(env_values, index),
                     g_setenv_log(name, value, 1);
-
-                    // Look for a DISPLAY. WAYLAND_DISPLAY overrides
-                    // DISPLAY
-                    if (strcmp(name, "WAYLAND_DISPLAY") == 0)
-                    {
-                        display = value;
-                        is_x11 = 0;
-                    }
-                    else if (display == NULL && strcmp(name, "DISPLAY") == 0)
-                    {
-                        display = value;
-                        is_x11 = 1;
-                    }
                 }
             }
 
-            // Set things dependent on the DISPLAY
-            if (display != NULL)
+            if (g_get_display_string(display, sizeof(display)) == 0)
             {
                 /* pulse sink socket */
                 g_snprintf(text, sizeof(text), CHANSRV_PORT_OUT_BASE_STR,
@@ -137,7 +124,7 @@ env_set_user(int uid,
                 g_setenv_log("XRDP_PULSE_SOURCE_SOCKET", text, 1);
 
                 // Only set Xauthority for X11
-                if (is_x11 && g_cfg->sec.xauth_in_sysdir)
+                if (g_get_x11_display_from_display_string(display) >= 0)
                 {
                     g_snprintf(text, sizeof(text),
                                XRDP_SOCKET_PATH "/Xauthority", uid);
