@@ -147,11 +147,12 @@ jobs:
                   --enable-mp3lame --enable-fdkaac --enable-opus --enable-rfxcodec
                   --enable-painter --enable-pixman --enable-utmp
                   --with-imlib2 --with-freetype2 --enable-tests --enable-x264
-                  --enable-openh264"
+                  --enable-openh264 --enable-smartcard"
       CONF_FLAGS_i386_max: "--enable-ipv6 --enable-jpeg
                   --enable-mp3lame --enable-opus --enable-rfxcodec
                   --enable-painter --disable-pixman
-                  --with-freetype2 --host=i686-linux --enable-tests"
+                  --with-freetype2 --host=i686-linux --enable-tests
+                  --enable-smartcard"
 
       PKG_CONFIG_PATH_i386: "/usr/lib/i386-linux-gnu/pkgconfig"
     steps:
