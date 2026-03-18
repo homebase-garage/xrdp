@@ -18,7 +18,7 @@ jobs:
                   --enable-x264 --enable-openh264
                   --with-imlib2 --with-freetype2 --enable-tests"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Download Coverity build tool
         run: |
