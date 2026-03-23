@@ -95,18 +95,10 @@ AC_ARG_ENABLE(ipv6, AS_HELP_STRING([--enable-ipv6],
 AC_ARG_ENABLE(ipv6only, AS_HELP_STRING([--enable-ipv6only],
               [Build IPv6-only (default: no)]),
               [], [enable_ipv6only=no])
-AC_ARG_ENABLE(kerberos, AS_HELP_STRING([--enable-kerberos],
-              [Build kerberos support (prefer --enable-pam if available) (default: no)]),
-              [], [enable_kerberos=no])
-AM_CONDITIONAL(SESMAN_KERBEROS, [test x$enable_kerberos = xyes])
 AC_ARG_ENABLE(bsd, AS_HELP_STRING([--enable-bsd],
               [Build BSD auth support (default: no)]),
               [], [enable_bsd=no])
 AM_CONDITIONAL(SESMAN_BSD, [test x$enable_bsd = xyes])
-AC_ARG_ENABLE(pamuserpass, AS_HELP_STRING([--enable-pamuserpass],
-              [Build PAM userpass support (default: no)]),
-              [], [enable_pamuserpass=no])
-AM_CONDITIONAL(SESMAN_PAMUSERPASS, [test x$enable_pamuserpass = xyes])
 AC_ARG_ENABLE(pam-config, AS_HELP_STRING([--enable-pam-config=CONF],
               [Select PAM config to install: arch, debian, redhat, suse, freebsd, macos, unix
                (default: autodetect)]))
@@ -388,24 +380,10 @@ then
   AUTHMOD_OBJ=verify_user_bsd.lo
   AUTHMOD_LIB=
 fi
-if test x$enable_kerberos = xyes
-then
-  auth_cnt=`expr $auth_cnt + 1`
-  auth_mech="Kerberos"
-  AUTHMOD_OBJ=verify_user_kerberos.lo
-  AUTHMOD_LIB=-lkrb5
-fi
-if test x$enable_pamuserpass = xyes
-then
-  auth_cnt=`expr $auth_cnt + 1`
-  auth_mech="PAM userpass"
-  AUTHMOD_OBJ=verify_user_pam_userpass.lo
-  AUTHMOD_LIB="-lpam -lpam_userpass"
-fi
 
 if test $auth_cnt -gt 1
 then
-  AC_MSG_ERROR([--enable-pam, --enable-bsd, --enable-pamuserpass and --enable-kerberos are mutually exclusive])
+  AC_MSG_ERROR([--enable-pam and --enable-bsd are mutually exclusive])
 fi
 
 AC_SUBST([AUTHMOD_OBJ])
