@@ -791,60 +791,82 @@ g_sck_close(int sck)
 
 #if defined(XRDP_ENABLE_IPV6)
 /*****************************************************************************/
-/* Helper function for g_tcp_connect.                                        */
+/**
+ * Helper for g_tcp_connect
+ * Returns boolean, 1 if the address is IPv4, else 0
+ */
 static int
-connect_loopback(int sck, const char *port)
+addr_is_ipv4(const char *address)
 {
-    struct sockaddr_in6 sa;
-    struct sockaddr_in s;
-    int res;
+    struct in_addr addr;
 
-    // First IPv6
-    g_memset(&sa, 0, sizeof(sa));
-    sa.sin6_family = AF_INET6;
-    sa.sin6_addr = in6addr_loopback;             // IPv6 ::1
-    sa.sin6_port = htons((tui16)atoi(port));
-    res = connect(sck, (struct sockaddr *)&sa, sizeof(sa));
-    if (res == -1 && errno == EINPROGRESS)
-    {
-        return -1;
-    }
-    if (res == 0 || (res == -1 && errno == EISCONN))
+    if (address == NULL || *address == '\0')
     {
         return 0;
     }
 
-    // else IPv4
-    g_memset(&s, 0, sizeof(s));
-    s.sin_family = AF_INET;
-    s.sin_addr.s_addr = htonl(INADDR_LOOPBACK);  // IPv4 127.0.0.1
-    s.sin_port = htons((tui16)atoi(port));
-    res = connect(sck, (struct sockaddr *)&s, sizeof(s));
-    if (res == -1 && errno == EINPROGRESS)
-    {
-        return -1;
-    }
-    if (res == 0 || (res == -1 && errno == EISCONN))
+    /* inet_pton returns 1 on success */
+    return inet_pton(AF_INET, address, &addr) == 1;
+}
+
+/*****************************************************************************/
+/**
+ * Helper for g_tcp_connect
+ * Returns boolean, 1 if the address is IPv6, else 0
+*/
+static int
+addr_is_ipv6(const char *address)
+{
+    struct in6_addr addr;
+
+    if (address == NULL || *address == '\0')
     {
         return 0;
     }
 
-    // else IPv6 with IPv4 address
-    g_memset(&sa, 0, sizeof(sa));
-    sa.sin6_family = AF_INET6;
-    inet_pton(AF_INET6, "::FFFF:127.0.0.1", &sa.sin6_addr);
-    sa.sin6_port = htons((tui16)atoi(port));
-    res = connect(sck, (struct sockaddr *)&sa, sizeof(sa));
-    if (res == -1 && errno == EINPROGRESS)
-    {
-        return -1;
-    }
-    if (res == 0 || (res == -1 && errno == EISCONN))
-    {
-        return 0;
-    }
+    /* inet_pton returns 1 on success */
+    return inet_pton(AF_INET6, address, &addr) == 1;
+}
 
-    return -1;
+/*****************************************************************************/
+/**
+ * Another helper for g_tcp_connect
+ * Get the family/domain for a socket
+ *
+ * This is a little awkward, as POSIX does not yet offer a
+ * standardized way to do this
+ */
+static int
+get_socket_family(int sck, int *family)
+{
+    int error;
+#ifdef SO_DOMAIN
+    socklen_t len = sizeof(*family);
+    // SO_DOMAIN is widely used but not defined by POSIX
+    error = getsockopt(sck, SOL_SOCKET, SO_DOMAIN, family, &len);
+    if (error != 0)
+    {
+        LOG(LOG_LEVEL_WARNING, "getsockopt() failed on socket %d: %s",
+            sck, g_get_strerror());
+    }
+#else
+    union sock_info sock_info;
+    socklen_t sock_len = sizeof(sock_info);
+
+    /* Use getsockname() as a fallback. This is not guaranteed to work
+    on an unbound socket, according to POSIX */
+    error = getsockname(sck, &sock_info.sa, &sock_len);
+    if (error != 0)
+    {
+        LOG(LOG_LEVEL_WARNING, "getsockname() failed on socket %d: %s",
+            sck, g_get_strerror());
+    }
+    else
+    {
+        *family = sock_info.sa.sa_family;
+    }
+#endif
+    return error;
 }
 #endif
 
@@ -856,42 +878,94 @@ connect_loopback(int sck, const char *port)
 int
 g_tcp_connect(int sck, const char *address, const char *port)
 {
+#define MAX_PORT_STR 6
     int res = 0;
     struct addrinfo p;
     struct addrinfo *h = (struct addrinfo *)NULL;
     struct addrinfo *rp = (struct addrinfo *)NULL;
+    const char *addr_arg = address;
+    char mapped_address[INET6_ADDRSTRLEN];
+    char host[INET6_ADDRSTRLEN];
+    char service[MAX_PORT_STR];
 
     g_memset(&p, 0, sizeof(struct addrinfo));
 
     p.ai_socktype = SOCK_STREAM;
     p.ai_protocol = IPPROTO_TCP;
-    p.ai_flags = AI_ADDRCONFIG | AI_V4MAPPED;
-    p.ai_family = AF_INET6;
-    if (g_strcmp(address, "127.0.0.1") == 0)
+
+    if (get_socket_family(sck, &p.ai_family) != 0)
     {
-        return connect_loopback(sck, port);
+        LOG(LOG_LEVEL_ERROR, "get_socket_family() failed on socket %d: %s",
+            sck, g_get_strerror());
+        return -1;
     }
-    else
+
+    switch (p.ai_family)
     {
-        res = getaddrinfo(address, port, &p, &h);
+        case AF_INET:
+            if (addr_is_ipv6(address))
+            {
+                LOG(LOG_LEVEL_ERROR, "g_tcp_connect: socket is IPv4, but address is IPv6: %s",
+                    address);
+                return -1;
+            }
+            p.ai_flags = AI_ADDRCONFIG;
+            break;
+
+        case AF_INET6:
+            // AI_ALL + MAPPED ensures we will get the v4 mapped addr back later
+            // no ADDRCONFIG because v4 can still be mapped on v6, so is still worth attempting
+            p.ai_flags = AI_V4MAPPED | AI_ALL;
+            if (addr_is_ipv4(address))
+            {
+                /* Dest was IPv4, but sck is IPv6, so convert IPv4 dest literal to IPv4-mapped IPv6 literal:
+                ipv6 with ipv4 address, for short */
+                g_snprintf(mapped_address, sizeof(mapped_address), "::FFFF:%s", address);
+                addr_arg = mapped_address;
+            }
+            break;
+
+        default:
+            LOG(LOG_LEVEL_ERROR, "g_tcp_connect: Unknown socket family %d", p.ai_family);
+            return -1;
     }
+
+    /* by now we have covered if dest was a direct ip that was mismatch with sck, so
+    the only hiccup can be a hostname that doesn't actually have any valid options.
+    Time to attempt to connect on every option we've got */
+    res = getaddrinfo(addr_arg, port, &p, &h);
     if (res != 0)
     {
         LOG(LOG_LEVEL_ERROR, "g_tcp_connect(%d, %s, %s): getaddrinfo() failed: %s",
             sck, address, port, gai_strerror(res));
     }
-    if (res > -1)
+    if (res == 0)
     {
         if (h != NULL)
         {
             for (rp = h; rp != NULL; rp = rp->ai_next)
             {
+                // NI_NUMERICHOST and NI_NUMERICSERV are POSIX, so they should be safe to use
+                res = getnameinfo(rp->ai_addr, rp->ai_addrlen, host, INET6_ADDRSTRLEN,
+                                  service, MAX_PORT_STR, NI_NUMERICHOST | NI_NUMERICSERV);
+                if (res != 0)
+                {
+                    // can't really count on host/service being accurate if getnameinfo fails
+                    LOG(LOG_LEVEL_ERROR, "g_tcp_connect(%d, %s, %s): getnameinfo failed",
+                        sck, address, port);
+                    res = -1;
+                    break;
+                }
+                LOG(LOG_LEVEL_DEBUG, "g_tcp_connect(%d, %s, %s): trying address: %s:%s",
+                    sck, address, port, host, service);
+
                 res = connect(sck, (struct sockaddr *)(rp->ai_addr),
                               rp->ai_addrlen);
                 if (res == -1 && errno == EINPROGRESS)
                 {
                     break; /* Return -1 */
                 }
+                /* Mac OSX connect() returns -1 for already established connections */
                 if (res == 0 || (res == -1 && errno == EISCONN))
                 {
                     res = 0;
