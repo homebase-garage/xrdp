@@ -45,9 +45,7 @@ module_LTLIBRARIES = \
 EXTRA_libsesman_la_SOURCES = \
  verify_user.c \
  verify_user_bsd.c \
- verify_user_kerberos.c \
- verify_user_pam.c \
- verify_user_pam_userpass.c
+ verify_user_pam.c
 
 # Make sure the right authentication module is pulled in
 libsesman_la_DEPENDENCIES = $(AUTHMOD_OBJ)
