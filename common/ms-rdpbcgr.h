@@ -152,13 +152,18 @@
 #define SEC_TAG_KEYSIG                 0x0008 /* BB_SIGNATURE_KEY_BLOB */
 
 /* Info Packet (TS_INFO_PACKET): flags (2.2.1.11.1.1) */
-/* TODO: to be renamed */
-#define RDP_LOGON_AUTO                 0x0008
-#define RDP_LOGON_NORMAL               0x0033
-#define RDP_COMPRESSION                0x0080
-#define RDP_LOGON_BLOB                 0x0100
-#define RDP_LOGON_LEAVE_AUDIO          0x2000
-#define RDP_LOGON_RAIL                 0x8000
+#define INFO_MOUSE                     0x00000001
+#define INFO_DISABLECTRLALTDEL         0x00000002
+#define INFO_AUTOLOGON                 0x00000008
+#define INFO_UNICODE                   0x00000010
+#define INFO_MAXIMIZESHELL             0x00000020
+#define INFO_LOGONNOTIFY               0x00000040
+#define INFO_COMPRESSION               0x00000080
+#define INFO_ENABLEWINDOWSKEY          0x00000100
+#define INFO_REMOTECONSOLEAUDIO        0x00002000
+#define INFO_RAIL                      0x00008000
+/* Windows always sends at least 0x33 */
+#define INFO_LOGON_NORMAL              (INFO_MOUSE | INFO_DISABLECTRLALTDEL | INFO_UNICODE | INFO_MAXIMIZESHELL)
 
 /* Extended Info Packet: clientAddress (2.2.1.11.1.1.1) */
 #define EXTENDED_INFO_MAX_CLIENT_ADDR_LENGTH 80
