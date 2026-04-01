@@ -410,14 +410,14 @@ xrdp_sec_process_logon_info(struct xrdp_sec *self, struct stream *s)
     LOG_DEVEL(LOG_LEVEL_TRACE, "Parsing [MS-RDPBCGR] TS_INFO_PACKET");
 
     /* this is the first test that the decrypt is working */
-    if ((flags & RDP_LOGON_NORMAL) != RDP_LOGON_NORMAL) /* 0x33 */
+    if ((flags & INFO_LOGON_NORMAL) != INFO_LOGON_NORMAL) /* 0x33 */
     {
         /* must be or error */
         LOG(LOG_LEVEL_ERROR, "received wrong flags, likely decrypt not working");
         return 1;
     }
 
-    if (flags & RDP_LOGON_LEAVE_AUDIO)
+    if (flags & INFO_REMOTECONSOLEAUDIO)
     {
         self->rdp_layer->client_info.sound_code = 1;
         LOG_DEVEL(LOG_LEVEL_DEBUG, "[MS-RDPBCGR] TS_INFO_PACKET flag INFO_REMOTECONSOLEAUDIO found");
@@ -425,7 +425,7 @@ xrdp_sec_process_logon_info(struct xrdp_sec *self, struct stream *s)
             "Client requested that audio on the server be played on the server.");
     }
 
-    if (flags & RDP_LOGON_RAIL)
+    if (flags & INFO_RAIL)
     {
         self->rdp_layer->client_info.rail_enable = 1;
         LOG_DEVEL(LOG_LEVEL_DEBUG, "[MS-RDPBCGR] TS_INFO_PACKET flag INFO_RAIL found");
@@ -433,7 +433,7 @@ xrdp_sec_process_logon_info(struct xrdp_sec *self, struct stream *s)
             "Client requested Remote Application Integrated Locally (RAIL).");
     }
 
-    if (flags & RDP_LOGON_AUTO)
+    if (flags & INFO_AUTOLOGON)
     {
         LOG_DEVEL(LOG_LEVEL_DEBUG, "[MS-RDPBCGR] TS_INFO_PACKET flag INFO_AUTOLOGON found");
         /* todo, for now not allowing autologon and mce both */
@@ -448,7 +448,7 @@ xrdp_sec_process_logon_info(struct xrdp_sec *self, struct stream *s)
         }
     }
 
-    if (flags & RDP_COMPRESSION)
+    if (flags & INFO_COMPRESSION)
     {
         LOG_DEVEL(LOG_LEVEL_DEBUG, "[MS-RDPBCGR] TS_INFO_PACKET flag INFO_COMPRESSION found, "
                   "CompressionType 0x%1.1x", (flags & 0x00001E00) >> 9);
@@ -574,7 +574,7 @@ xrdp_sec_process_logon_info(struct xrdp_sec *self, struct stream *s)
     // If we require credentials, don't continue if they're not provided
     if (self->rdp_layer->client_info.require_credentials)
     {
-        if ((flags & RDP_LOGON_AUTO) == 0)
+        if ((flags & INFO_AUTOLOGON) == 0)
         {
             LOG(LOG_LEVEL_ERROR, "Server is configured to require that the "
                 "client enable auto logon with credentials, but the client did "
@@ -590,7 +590,7 @@ xrdp_sec_process_logon_info(struct xrdp_sec *self, struct stream *s)
         }
     }
 
-    if (flags & RDP_LOGON_AUTO)
+    if (flags & INFO_AUTOLOGON)
     {
         if (ts_info_utf16_in(s, len_password, self->rdp_layer->client_info.password, sizeof(self->rdp_layer->client_info.password)) != 0)
         {
@@ -657,7 +657,7 @@ xrdp_sec_process_logon_info(struct xrdp_sec *self, struct stream *s)
 
     /* TODO: explain why the windows key flag is used to determine if the
        TS_EXTENDED_INFO_PACKET should be parsed */
-    if (flags & RDP_LOGON_BLOB) /* INFO_ENABLEWINDOWSKEY */
+    if (flags & INFO_ENABLEWINDOWSKEY)
     {
         if (!s_check_rem_and_log(s, 4, "Parsing [MS-RDPBCGR] TS_EXTENDED_INFO_PACKET "
                                  "clientAddressFamily and cbClientAddress"))
