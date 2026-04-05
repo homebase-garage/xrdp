@@ -110,4 +110,4 @@ if FREEBSD
 		$(DESTDIR)$(sysconfdir)/rc.d/xrdp-sesman
 endif
 	(cd $(DESTDIR)${startscriptdir} && \
-		$(LN_S) km-00010426.toml km-00020426.toml)
+		$(LN_S) -f km-00010426.toml km-00020426.toml)
