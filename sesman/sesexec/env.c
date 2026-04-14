@@ -40,7 +40,7 @@
 #include "xrdp_sockets.h"
 
 /******************************************************************************/
-int
+void
 env_set_user(int uid,
              const struct list *env_names, const struct list *env_values)
 {
@@ -58,90 +58,98 @@ env_set_user(int uid,
     error = g_getuser_info_by_uid(uid, &pw_username, &pw_gid, &pw_shell,
                                   &pw_dir, 0);
 
-    if (error == 0)
+    if (error != 0)
     {
-        g_rm_temp_dir();
-        g_clearenv();
+        LOG(LOG_LEVEL_ALWAYS,
+            "fatal error getting user info for uid %d: %s", uid,
+            g_get_strerror());
+        goto fatal;
+    }
+    g_rm_temp_dir();
+    g_clearenv();
 #ifdef HAVE_SETUSERCONTEXT
-        error = g_set_allusercontext(uid);
+    if (g_set_allusercontext(uid) != 0)
+    {
+        LOG(LOG_LEVEL_ALWAYS,
+            "fatal error setting allusercontext for uid %d: %s",
+            uid, g_get_strerror());
+        goto fatal;
+    }
 #else
-        /* Set some of the things setusercontext() handles on other
-         * systems */
+    /* Set some of the things setusercontext() handles on other
+     * systems */
 
-        /* Primary group. Note that secondary groups should already
-         * have been set, if we're not using setusercontext() */
-        error = g_setgid(pw_gid);
+    /* GID/UID. Note that secondary groups should already
+     * have been set, if we're not using setusercontext() */
+    if (g_setgid(pw_gid) != 0 || g_setuid(uid) != 0)
+    {
+        LOG(LOG_LEVEL_ALWAYS,
+            "fatal error getting setting uid:gid to %d:%d - %s",
+            uid, pw_gid, g_get_strerror());
+        goto fatal;
+    }
 
-        if (error == 0)
-        {
-            error = g_setuid(uid);
-        }
-
-        if (error == 0)
-        {
-            g_setenv_log("PATH", "/sbin:/bin:/usr/bin:/usr/local/bin", 1);
-        }
+    g_setenv_log("PATH", "/sbin:/bin:/usr/bin:/usr/local/bin", 1);
 #endif
-        if (error == 0)
+
+    g_setenv_log("SHELL", pw_shell, 1);
+    g_setenv_log("USER", pw_username, 1);
+    g_setenv_log("LOGNAME", pw_username, 1);
+    g_snprintf(text, sizeof(text), "%d", uid);
+    g_setenv_log("UID", text, 1);
+    g_setenv_log("HOME", pw_dir, 1);
+    g_set_current_dir(pw_dir);
+    // Use our PID as the XRDP_SESSION value
+    g_snprintf(text, sizeof(text), "%d", g_pid);
+    g_setenv_log("XRDP_SESSION", text, 1);
+    /* XRDP_SOCKET_PATH is used by
+     * xorgxrdp and the pulseaudio plugin */
+    g_snprintf(text, sizeof(text), XRDP_SOCKET_PATH, uid);
+    g_setenv_log("XRDP_SOCKET_PATH", text, 1);
+
+    // Set the passed-in variables. This may include a DISPLAY,
+    // or WAYLAND_DISPLAY
+    if ((env_names != 0) && (env_values != 0) &&
+            (env_names->count == env_values->count))
+    {
+        for (index = 0; index < env_names->count; index++)
         {
-            g_setenv_log("SHELL", pw_shell, 1);
-            g_setenv_log("USER", pw_username, 1);
-            g_setenv_log("LOGNAME", pw_username, 1);
-            g_snprintf(text, sizeof(text), "%d", uid);
-            g_setenv_log("UID", text, 1);
-            g_setenv_log("HOME", pw_dir, 1);
-            g_set_current_dir(pw_dir);
-            // Use our PID as the XRDP_SESSION value
-            g_snprintf(text, sizeof(text), "%d", g_pid);
-            g_setenv_log("XRDP_SESSION", text, 1);
-            /* XRDP_SOCKET_PATH is used by
-             * xorgxrdp and the pulseaudio plugin */
-            g_snprintf(text, sizeof(text), XRDP_SOCKET_PATH, uid);
-            g_setenv_log("XRDP_SOCKET_PATH", text, 1);
-
-            // Set the passed-in variables. This may include a DISPLAY,
-            // or WAYLAND_DISPLAY
-            if ((env_names != 0) && (env_values != 0) &&
-                    (env_names->count == env_values->count))
-            {
-                for (index = 0; index < env_names->count; index++)
-                {
-                    name = (char *) list_get_item(env_names, index),
-                    value = (char *) list_get_item(env_values, index),
-                    g_setenv_log(name, value, 1);
-                }
-            }
-
-            if (g_get_display_string(display, sizeof(display)) == 0)
-            {
-                /* pulse sink socket */
-                g_snprintf(text, sizeof(text), CHANSRV_PORT_OUT_BASE_STR,
-                           display);
-                g_setenv_log("XRDP_PULSE_SINK_SOCKET", text, 1);
-                /* pulse source socket */
-                g_snprintf(text, sizeof(text), CHANSRV_PORT_IN_BASE_STR,
-                           display);
-                g_setenv_log("XRDP_PULSE_SOURCE_SOCKET", text, 1);
-
-                // Only set Xauthority for X11
-                if (g_get_x11_display_from_display_string(display) >= 0)
-                {
-                    g_snprintf(text, sizeof(text),
-                               XRDP_SOCKET_PATH "/Xauthority", uid);
-                    g_setenv_log("XAUTHORITY", text, 1);
-                }
-            }
+            name = (char *) list_get_item(env_names, index),
+            value = (char *) list_get_item(env_values, index),
+            g_setenv_log(name, value, 1);
         }
     }
-    else
+
+    if (g_get_display_string(display, sizeof(display)) == 0)
     {
-        LOG(LOG_LEVEL_ERROR,
-            "error getting user info for uid %d", uid);
+        /* pulse sink socket */
+        g_snprintf(text, sizeof(text), CHANSRV_PORT_OUT_BASE_STR,
+                   display);
+        g_setenv_log("XRDP_PULSE_SINK_SOCKET", text, 1);
+        /* pulse source socket */
+        g_snprintf(text, sizeof(text), CHANSRV_PORT_IN_BASE_STR,
+                   display);
+        g_setenv_log("XRDP_PULSE_SOURCE_SOCKET", text, 1);
+
+        // Only set Xauthority for X11
+        if (g_get_x11_display_from_display_string(display) >= 0)
+        {
+            g_snprintf(text, sizeof(text),
+                       XRDP_SOCKET_PATH "/Xauthority", uid);
+            g_setenv_log("XAUTHORITY", text, 1);
+        }
     }
 
     g_free(pw_username);
     g_free(pw_dir);
     g_free(pw_shell);
 
-    return error;
+    return;
+
+fatal:
+    g_free(pw_username);
+    g_free(pw_dir);
+    g_free(pw_shell);
+
+    g_exit(1);
 }
