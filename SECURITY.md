@@ -10,3 +10,8 @@ If you have anything else you want to report privately to developers, send us an
 
 * [xrdp-core@googlegroups.com](mailto:xrdp-core@googlegroups.com)
 
+## Handling of Duplicate Reports
+
+Due to the high volume of vulnerability reports we receive, duplicate reports are handled on a first-come-first-served basis, even if discovered independently by different parties. Consequently, only the first reporter will be acknowledged in the public advisory.
+
+As reports remain confidential until public disclosure, reporters may not know if they are the first to submit. We appreciate your understanding.
