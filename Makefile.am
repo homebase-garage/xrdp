@@ -46,12 +46,6 @@ else
 RFXCODECDIR =
 endif
 
-if XRDP_ULALACA
-ULALACADIR = ulalaca
-else
-ULALACADIR =
-endif
-
 if XRDP_ACCEL
 ACCELDIR = xrdp_accel_assist
 else
@@ -82,7 +76,6 @@ SUBDIRS = \
   xrdpapi \
   pkgconfig \
   $(XRDPVRDIR) \
-  $(ULALACADIR) \
   tests \
   tools \
   $(ACCELDIR)
