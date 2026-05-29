@@ -650,6 +650,7 @@ prepare_xvnc_xserver_params(const struct session_data *sd,
                        "%d", 0660); /* rw-rw---- */
 
             list_add_strdup_multi(params,
+                                  "-rfbport", "-1",
                                   "-rfbunixpath", port,
                                   "-rfbunixmode", sock_mode,
                                   "-SecurityTypes", "None",
